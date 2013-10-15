@@ -289,17 +289,18 @@ class pBaseForm(QtGui.QMainWindow):
         xmax,ymax=self.workflow.datas.shape
         palette=cm.get_cmap(self.plotsettings.palette)
         if self.plotsettings.IsSqrt: palette=cmap_xmap(lambda x: x**2,palette)
-        self.axes.imshow(self.workflow.datas,origin='lower',cmap=palette)
+        self.axes.imshow(self.workflow.datas,extent=[0,ymax,0,xmax],origin='lower',cmap=palette)
         
         if self.workflow.r!=0.:
             xc,yc= paint_circle(self.workflow.center,self.workflow.r)
             self.axes.plot(xc,yc,'r',lw=2)
         
-        self.axes.axis=[0,xmax,0,ymax]
+        self.axes.axis([0,ymax,0,xmax])
         # no label
         nullfmt = NullFormatter()
         self.axes.yaxis.set_major_formatter(nullfmt)
         self.axes.xaxis.set_major_formatter(nullfmt)
+        self.axes.tick_params(bottom='off',top='off',left='off',right='off')
         self.canvas.draw()
         del palette
         
