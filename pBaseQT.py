@@ -51,7 +51,6 @@ class pBaseForm(QtGui.QMainWindow):
         self.Wplot.setLayout(self.LPlot)
             # Bind the 'pick' event for clicking on one of the bars
         self.canvas.mpl_connect('button_press_event', self.on_press)
-        self.display()
         
         #Create the Tool Box on the side
         self.VerticalWidget = QtGui.QWidget()
@@ -108,6 +107,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.gridLayout.setObjectName("CenterBoxLayout")
         self.YSlider = QtGui.QSlider(self.CenterBox)
         self.YSlider.setOrientation(QtCore.Qt.Horizontal)
+        self.YSlider.valueChanged[int].connect(self.changeYValue)
         self.YSlider.setObjectName("YSlider")
         self.gridLayout.addWidget(self.YSlider, 1, 1, 1, 1)
         self.TransposeButton = QtGui.QPushButton(self.CenterBox)
@@ -117,6 +117,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.gridLayout.addWidget(self.TransposeButton, 2, 0, 1, 1)
         self.XSlider = QtGui.QSlider(self.CenterBox)
         self.XSlider.setOrientation(QtCore.Qt.Horizontal)
+        self.XSlider.valueChanged[int].connect(self.changeXValue)
         self.XSlider.setObjectName("XSlider")
         self.gridLayout.addWidget(self.XSlider, 0, 1, 1, 1)
         self.FixCenterBox = QtGui.QCheckBox(self.CenterBox)
@@ -236,7 +237,8 @@ class pBaseForm(QtGui.QMainWindow):
         
         self.centralwidget.setLayout(self.MLayout)
         MainWindow.setCentralWidget(self.centralwidget)
-
+        self.display()
+		
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QtGui.QApplication.translate("MainWindow", "pBaseQt", None, QtGui.QApplication.UnicodeUTF8))
         self.groupBox.setTitle(QtGui.QApplication.translate("MainWindow", "Treatments", None, QtGui.QApplication.UnicodeUTF8))
@@ -286,13 +288,18 @@ class pBaseForm(QtGui.QMainWindow):
         """
         self.axes.clear()
         xmax,ymax=self.workflow.datas.shape
+        self.XSlider.setMaximum(xmax)
+        self.YSlider.setMaximum(ymax)
+        self.XSlider.setValue(self.workflow.center[0])
+        self.YSlider.setValue(self.workflow.center[1])
         palette=cm.get_cmap(self.plotsettings.palette)
         if self.plotsettings.IsSqrt: palette=cmap_xmap(lambda x: x**2,palette)
         self.axes.imshow(self.workflow.datas,extent=[0,ymax,0,xmax],origin='lower',cmap=palette)
         
         if self.workflow.r!=0.:
             xc,yc= paint_circle(self.workflow.center,self.workflow.r)
-            self.axes.plot(xc,yc,'r',lw=2)
+            scalarMap = cm.ScalarMappable(norm=colors.Normalize(vmin=0, vmax=256), cmap=palette)
+            self.axes.plot(xc,yc,color=scalarMap.to_rgba(256),lw=2)
         
         self.axes.axis([0,ymax,0,xmax])
         # no label
@@ -333,7 +340,10 @@ class pBaseForm(QtGui.QMainWindow):
             Sqrt cmap scale 
         """
         if state == QtCore.Qt.Checked: self.plotsettings.IsSqrt=True
-        else: self.plotsettings.IsSqrt=False
+        else: 
+        	self.plotsettings.IsSqrt=False
+        	palette=cm.get_cmap(self.plotsettings.palette)
+        	palette=cmap_xmap(lambda x: np.sqrt(x),palette)
         self.display() 
 
     def ChangeOdd(self,state):
@@ -361,7 +371,14 @@ class pBaseForm(QtGui.QMainWindow):
     def ICenterFn(self):
         if not self.plotsettings.IsFixed: self.workflow.get_com()
         self.display()
-        #Need to update display and check if something printed
+    
+    def changeXValue(self,value):
+    	if not self.plotsettings.IsFixed: self.workflow.center=(value,self.workflow.center[1])
+    	self.display()
+    	
+    def changeYValue(self,value):
+    	if not self.plotsettings.IsFixed: self.workflow.center=(self.workflow.center[0],value)
+    	self.display()
     
     def on_press(self,event):
         if event.inaxes and not self.plotsettings.IsFixed: 
