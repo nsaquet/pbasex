@@ -130,6 +130,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.gridLayout.addWidget(self.AutoButton, 0, 0, 1, 1)
         self.SymButton = QtGui.QPushButton(self.CenterBox)
         self.SymButton.setObjectName("SymButton")
+        self.SymButton.clicked.connect(self.SymmetrizeFn)
         self.gridLayout.addWidget(self.SymButton, 1, 0, 1, 1)
         self.ImageCenterBtn = QtGui.QPushButton(self.CenterBox)
         self.ImageCenterBtn.setObjectName("ImageCenterBtn")
@@ -237,6 +238,7 @@ class pBaseForm(QtGui.QMainWindow):
         
         self.centralwidget.setLayout(self.MLayout)
         MainWindow.setCentralWidget(self.centralwidget)
+        self.statusBar().showMessage("Test")
         self.display()
 		
     def retranslateUi(self, MainWindow):
@@ -366,6 +368,18 @@ class pBaseForm(QtGui.QMainWindow):
     def TransposeFn(self):
         self.workflow.datas=self.workflow.datas.T
         self.workflow.center=(self.workflow.center[1],self.workflow.center[0])
+        self.display()
+        
+    def SymmetrizeFn(self):
+    	"""
+    		Symmetrise a 2_D circular selection vertically (ie about a horizontal axis). 
+    		Assume that the centre is mid-pixel (x0,y0) rather than at lower left corner
+    		of pixel x0,y0. Assume destination array bb[][] is pre-zeroed. Note that no 
+    		symmetrisation is needed horizontally since the Legendre polynomials are 
+    		already symmetric along the vertical axis. (Vertically being the polarisation 
+    		axis of the ligth, or the direction of propagation in the case of cpl).
+    	"""
+        self.workflow.Symmetrize()
         self.display()
         
     def ICenterFn(self):
