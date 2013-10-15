@@ -23,6 +23,7 @@ class PlotSettings():
     def __init__(self):
         self.palette=cm.jet.name
         self.IsSqrt=False
+        self.IsFixed=False
 
 class pBaseForm(QtGui.QMainWindow):
     def setupUi(self, MainWindow):
@@ -32,10 +33,7 @@ class pBaseForm(QtGui.QMainWindow):
         
         #Create Main Window
         MainWindow.setObjectName("MainWindow")
-        #MainWindow.resize(830, 539)
-        #MainWindow.setMinimumSize(QtCore.QSize(800, 425))
-        #MainWindow.setMaximumSize(QtCore.QSize(2000, 1025))
-        #MainWindow.setSizeIncrement(QtCore.QSize(10, 5))
+        
         #Fit Main window with a Widget
         self.centralwidget = QtGui.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
@@ -122,6 +120,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.XSlider.setObjectName("XSlider")
         self.gridLayout.addWidget(self.XSlider, 0, 1, 1, 1)
         self.FixCenterBox = QtGui.QCheckBox(self.CenterBox)
+        self.FixCenterBox.stateChanged.connect(self.ChangeFixCenter)
         self.FixCenterBox.setObjectName("FixCenterBox")
         self.gridLayout.addWidget(self.FixCenterBox, 2, 1, 1, 1)
         self.AutoButton = QtGui.QPushButton(self.CenterBox)
@@ -344,18 +343,28 @@ class pBaseForm(QtGui.QMainWindow):
     def ChangeLmax(self,number):
         self.workflow.lmax=number
     
+    def ChangeFixCenter(self,state):
+    	"""
+    		If pressed, if fixes the centre of the image to the most recent value and 
+    		prevents the user from changing it by clicking the mouse on the image window. 
+    		It also forces the panel to give the distance from the centre instead of the 
+    		cartesian coordinates.
+    	"""
+    	if state == QtCore.Qt.Checked: self.plotsettings.IsFixed=True
+    	else: self.plotsettings.IsFixed=False
+    
     def TransposeFn(self):
         self.workflow.datas=self.workflow.datas.T
         self.workflow.center=(self.workflow.center[1],self.workflow.center[0])
         self.display()
         
     def ICenterFn(self):
-        self.workflow.get_com()
+        if not self.plotsettings.IsFixed: self.workflow.get_com()
         self.display()
         #Need to update display and check if something printed
     
     def on_press(self,event):
-        if event.inaxes: 
+        if event.inaxes and not self.plotsettings.IsFixed: 
             self.workflow.center=(event.xdata,event.ydata)
         self.canvas.mpl_connect('button_release_event', self.on_release)
     
