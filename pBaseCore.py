@@ -19,7 +19,7 @@ class Datas():
         x=np.arange(0,10,0.01)
         y=np.arange(0,10,0.01)
         X,Y=np.meshgrid(x,y)
-        self.datas=np.exp(-((X-5)**2+(Y-5)**2))
+        self.datas=np.exp(-((X-5)**2+(Y-4)**2))
         self.center=(0.,0.)
         self.r=0.
         
@@ -71,24 +71,25 @@ class Datas():
             bound problems are possible
 
         """
-        print self.center
-        offset=(int(self.center[0]-self.r),int(self.center[1]-self.r))
-        listx=np.arange(offset[0],self.center[0]+self.r,dtype=int)  
-        listy=np.arange(offset[1],self.center[1]+self.r,dtype=int)
-        xx,yy=np.meshgrid(listx,listy) 
-        #crit=np.zeros_like(xx)  
-        #for i,j in zip(np.ravel(xx),np.ravel(yy)): crit[i-offset[0],j-offset[1]]=self.CenteringCriterion(i,j)
-        crit=np.array([self.CenteringCriterion(i,j) for i,j in zip(np.ravel(xx),np.ravel(yy))]).reshape(xx.shape)
-        critind=np.where(crit==crit.max())
-        print critind
-        self.center=(critind[0][0]+offset[0],critind[1][0]+offset[1])
-        print self.center
-    
+        print self.center,self.r
+        Cmax=0
+        center,Cn=self.Newcenter(10)
+        for i in np.arange(20):
+        	if Cn>Cmax:
+        		self.center=center
+        		Cmax=Cn
+        		print Cn, center
+        		center,Cn=self.Newcenter(10)
+        	else: break
         
-        #crit=np.array([self.CenteringCriterion(i,j) for i,j in zip(np.ravel(xx),np.ravel(yy))]).reshape(xx.shape)
-       
-        #self.center=(Ncenter[0]+offset[0],Ncenter[1]+offset[1])
-    
+    def Newcenter(self,dr):
+    	xl=np.arange(self.center[0]-dr,self.center[0]+dr,dtype=int)
+    	yl=np.arange(self.center[1]-dr,self.center[1]+dr,dtype=int)
+    	crit=np.array([self.CenteringCriterion(i,j) for i in xl for j in yl]).reshape((2*dr,2*dr))
+    	critmax=np.where(crit==crit.max())
+    	print critmax
+    	return (critmax[0][0]+self.center[0]-dr,critmax[1][0]+self.center[1]-dr), crit.max()
+    	
     def CenteringCriterion(self,x0,y0):
         """
             Evaluates Bordas centring criterion: Sum T_ij bt T*_ij 
