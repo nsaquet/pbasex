@@ -85,9 +85,8 @@ class Datas():
     def Newcenter(self,dr):
     	xl=np.arange(self.center[0]-dr,self.center[0]+dr,dtype=int)
     	yl=np.arange(self.center[1]-dr,self.center[1]+dr,dtype=int)
-    	crit=np.array([self.CenteringCriterion(i,j) for i in xl for j in yl]).reshape((2*dr,2*dr))
+    	crit=np.array([self.CenteringCriterion(j,i) for i in xl for j in yl]).reshape((2*dr,2*dr))
     	critmax=np.where(crit==crit.max())
-    	print critmax
     	return (critmax[0][0]+self.center[0]-dr,critmax[1][0]+self.center[1]-dr), crit.max()
     	
     def CenteringCriterion(self,x0,y0):
