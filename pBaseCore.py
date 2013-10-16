@@ -11,16 +11,15 @@ def Generate_Basis(lmax,odd):
     _libpBasis.write_forward.restype=ct.c_void_p
     _libpBasis.write_forward(ct.c_int(lmax),ct.c_int(odd))
 
-def CenterImage2D(image):
-    return com(image)
-    
-
 class Datas():
     def __init__(self):
         self.lmax=2
         self.odd=0
         self.raw=2.*np.random.normal(0.5,size=(256,256))
-        self.datas=0.5*self.raw
+        x=np.arange(0,10,0.01)
+        y=np.arange(0,10,0.01)
+        X,Y=np.meshgrid(x,y)
+        self.datas=np.exp(-((X-5)**2+(Y-5)**2))
         self.center=(0.,0.)
         self.r=0.
         
@@ -45,7 +44,9 @@ class Datas():
         else: print "Incorrect data file format"
         
     def get_com(self):
-        self.center=CenterImage2D(self.datas)
+        datmax=self.datas.max()
+        mask=(self.datas>datmax*0.25)
+        self.center=com(self.datas.T,mask.T)
         
     def Symmetrize(self):
         """
@@ -61,3 +62,55 @@ class Datas():
         yindex=np.arange(self.center[1]-self.r,self.center[1]+self.r,dtype=int)
         for k in xindex: self.datas[yindex,k]=0.5*(self.datas[yindex,k]+self.datas[yindex[::-1],k])
         
+    def AutoCenter(self):
+        """
+            Using the Bordas TT* criterion walk across the image from trial 
+            centre in a (crude) search for that which maximises TT* function.
+            NB there ought to be checking that the region (x0,y0) and radius dr 
+            being searched always falls totally within image area, else array 
+            bound problems are possible
+
+        """
+        print self.center
+        offset=(int(self.center[0]-self.r),int(self.center[1]-self.r))
+        listx=np.arange(offset[0],self.center[0]+self.r,dtype=int)  
+        listy=np.arange(offset[1],self.center[1]+self.r,dtype=int)
+        xx,yy=np.meshgrid(listx,listy) 
+        #crit=np.zeros_like(xx)  
+        #for i,j in zip(np.ravel(xx),np.ravel(yy)): crit[i-offset[0],j-offset[1]]=self.CenteringCriterion(i,j)
+        crit=np.array([self.CenteringCriterion(i,j) for i,j in zip(np.ravel(xx),np.ravel(yy))]).reshape(xx.shape)
+        critind=np.where(crit==crit.max())
+        print critind
+        self.center=(critind[0][0]+offset[0],critind[1][0]+offset[1])
+        print self.center
+    
+        
+        #crit=np.array([self.CenteringCriterion(i,j) for i,j in zip(np.ravel(xx),np.ravel(yy))]).reshape(xx.shape)
+       
+        #self.center=(Ncenter[0]+offset[0],Ncenter[1]+offset[1])
+    
+    def CenteringCriterion(self,x0,y0):
+        """
+            Evaluates Bordas centring criterion: Sum T_ij bt T*_ij 
+            (where * indicate reflection through the trial centre (x0,y0).
+            Implicitly assumes centre is mid-pixel
+        """        
+        #Indexes within  the circle 
+        listx=np.arange(x0-self.r,x0+self.r,dtype=int)  
+        listy=np.arange(y0-self.r,y0+self.r,dtype=int)
+        xx,yy=np.meshgrid(listx,listy)   
+        listsquare=((xx-x0)**2 + (yy-y0)**2)<self.r**2
+        xind=xx[listsquare]
+        yind=yy[listsquare]
+        r_xind=int(2*x0)-xind
+        r_yind=int(2*y0)-yind
+        
+        return sum(self.datas[xind,yind]*self.datas[r_xind,r_yind])
+                
+"""
+	Need the auto center methode
+	Need Invert
+	Need Save
+	Need status bar
+	Need stability
+"""

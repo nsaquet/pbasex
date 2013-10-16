@@ -126,6 +126,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.gridLayout.addWidget(self.FixCenterBox, 2, 1, 1, 1)
         self.AutoButton = QtGui.QPushButton(self.CenterBox)
         self.AutoButton.setFlat(False)
+        self.AutoButton.clicked.connect(self.AutoCenterFn)
         self.AutoButton.setObjectName("AutoButton")
         self.gridLayout.addWidget(self.AutoButton, 0, 0, 1, 1)
         self.SymButton = QtGui.QPushButton(self.CenterBox)
@@ -374,13 +375,19 @@ class pBaseForm(QtGui.QMainWindow):
     	"""
     		Symmetrise a 2_D circular selection vertically (ie about a horizontal axis). 
     		Assume that the centre is mid-pixel (x0,y0) rather than at lower left corner
-    		of pixel x0,y0. Assume destination array bb[][] is pre-zeroed. Note that no 
-    		symmetrisation is needed horizontally since the Legendre polynomials are 
-    		already symmetric along the vertical axis. (Vertically being the polarisation 
+    		of pixel x0,y0. Note that no symmetrisation is needed 
+    		horizontally since the Legendre polynomials are already 
+    		symmetric along the vertical axis. (Vertically being the polarisation 
     		axis of the ligth, or the direction of propagation in the case of cpl).
     	"""
         self.workflow.Symmetrize()
         self.display()
+    
+    def AutoCenterFn(self):
+        if self.workflow.r==0.: self.display()
+        else: 
+            if not self.plotsettings.IsFixed: self.workflow.AutoCenter()
+            self.display()
         
     def ICenterFn(self):
         if not self.plotsettings.IsFixed: self.workflow.get_com()
