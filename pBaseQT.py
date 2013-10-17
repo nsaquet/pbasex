@@ -7,6 +7,7 @@
 #
 # WARNING! All changes made in this file will be lost!
 
+import time
 from PySide import QtCore, QtGui
 import matplotlib
 matplotlib.use('Qt4Agg')
@@ -46,6 +47,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.canvas = FigCanvas(self.fig)
         self.canvas.setParent(self.Wplot)
         self.axes=self.fig.add_subplot(111)
+        self.fig.tight_layout(pad=0.1)
         self.Wplot.setObjectName("Image")
         self.LPlot.addWidget(self.canvas)
         self.Wplot.setLayout(self.LPlot)
@@ -189,6 +191,7 @@ class pBaseForm(QtGui.QMainWindow):
         font.setBold(True)
         self.InvertButton.setFont(font)
         self.InvertButton.setObjectName("InvertButton")
+        self.InvertButton.clicked.connect(self.InvertFn)
         self.HBox.addWidget(self.InvertButton)
         self.SaveButton = QtGui.QPushButton(self.groupBox)
         self.SaveButton.setObjectName("SaveButton")
@@ -211,16 +214,13 @@ class pBaseForm(QtGui.QMainWindow):
         self.MLayout.addWidget(self.VerticalWidget)
         self.MLayout.setAlignment(self.Wplot,QtCore.Qt.AlignCenter)
         
-        #Define the Main window menu bar
+        #Define the Main window menu bar and statusbar
         self.menubar = QtGui.QMenuBar()
         self.menubar.setGeometry(QtCore.QRect(0, 0, 830, 22))
         self.menubar.setObjectName("menubar")
         self.menuFiles = QtGui.QMenu(self.menubar)
         self.menuFiles.setObjectName("menuFiles")
         MainWindow.setMenuBar(self.menubar)
-        self.statusbar = QtGui.QStatusBar(MainWindow)
-        self.statusbar.setObjectName("statusbar")
-        MainWindow.setStatusBar(self.statusbar)
         self.actionOpen = QtGui.QAction(MainWindow)
         self.actionOpen.setObjectName("actionOpen")
         self.actionOpen.setStatusTip("Open new File")
@@ -230,6 +230,19 @@ class pBaseForm(QtGui.QMainWindow):
         self.menuFiles.addAction(self.actionOpen)
         self.menuFiles.addAction(self.actionSave)
         self.menubar.addAction(self.menuFiles.menuAction())
+        #Status bar
+        self.statusbar = QtGui.QStatusBar(MainWindow)
+        self.statusbar.setObjectName("statusbar")
+        MainWindow.setStatusBar(self.statusbar)
+        self.statlabel = QtGui.QLabel()
+        self.statlabel.setText("Ready !")
+        self.statusbar.addWidget(self.statlabel,1)
+        self.statcoordinates = QtGui.QLabel()
+        self.statcoordinates.setText("x= , y= ")
+        self.statusbar.addWidget(self.statcoordinates,2)
+        self.progressBar = QtGui.QProgressBar()
+        self.statusbar.addWidget(self.progressBar,2)
+        self.progressBar.setVisible(False)
 
         self.retranslateUi(MainWindow)
         QtCore.QObject.connect(self.CloseButton, QtCore.SIGNAL("released()"), MainWindow.close)
@@ -239,7 +252,6 @@ class pBaseForm(QtGui.QMainWindow):
         
         self.centralwidget.setLayout(self.MLayout)
         MainWindow.setCentralWidget(self.centralwidget)
-        self.statusBar().showMessage("Test")
         self.display()
 		
     def retranslateUi(self, MainWindow):
@@ -277,9 +289,10 @@ class pBaseForm(QtGui.QMainWindow):
     def openFile(self):
         fname, _ = QtGui.QFileDialog.getOpenFileName(self,self.tr("Open data file"),"~/",self.tr("Fit Files (*.fit);;Image Files (*.tiff *.jpg *.bmp);;Txt (*.txt *.dat)"))
         if fname:
-            self.statusbar.showMessage(self.tr("Opening File %s" %fname))
+            self.statlabel.setText("Opening File %s" %fname)
             self.workflow.OpenFile(fname)
-        else: self.statusbar.showMessage(self.tr("Failed to open File"))
+            self.statlabel.setText("Go !")
+        else: self.statlabel.setText("Failed to open File")
         self.display()
         
     def openSave(self):
@@ -369,6 +382,7 @@ class pBaseForm(QtGui.QMainWindow):
     def TransposeFn(self):
         self.workflow.datas=self.workflow.datas.T
         self.workflow.center=(self.workflow.center[1],self.workflow.center[0])
+        self.statlabel.setText("Transposed")
         self.display()
         
     def SymmetrizeFn(self):
@@ -381,17 +395,42 @@ class pBaseForm(QtGui.QMainWindow):
     		axis of the ligth, or the direction of propagation in the case of cpl).
     	"""
         self.workflow.Symmetrize()
+        self.statlabel.setText("Symmetrized")
         self.display()
     
     def AutoCenterFn(self):
         if self.workflow.r==0.: self.display()
         else: 
-            if not self.plotsettings.IsFixed: self.workflow.AutoCenter()
+            if not self.plotsettings.IsFixed: 
+                Cmax=0
+                self.progressBar.setVisible(True)
+                self.progressBar.setValue(0)
+                self.progressBar.setRange(0,20)
+                self.statlabel.setText("Centering")
+                
+                center,Cn=self.workflow.Newcenter(10)
+                for i in np.arange(20):
+        	   if Cn>Cmax:
+        		self.workflow.center=center
+        		self.progressBar.setValue(i)
+        		self.display()
+        		Cmax=Cn
+        		#print Cn, center
+        		center,Cn=self.workflow.Newcenter(10)
+        	   else: 
+        	       self.progressBar.setValue(20)
+        	       break
+            self.statlabel.setText("Centered")
+            self.progressBar.setVisible(False)
             self.display()
         
     def ICenterFn(self):
         if not self.plotsettings.IsFixed: self.workflow.get_com()
         self.display()
+    
+    def InvertFn(self):
+    	self.workflow.Invert()
+    	self.display()
     
     def changeXValue(self,value):
     	if not self.plotsettings.IsFixed: self.workflow.center=(value,self.workflow.center[1])

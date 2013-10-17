@@ -71,14 +71,14 @@ class Datas():
             bound problems are possible
 
         """
-        print self.center,self.r
+        #print self.center,self.r
         Cmax=0
         center,Cn=self.Newcenter(10)
         for i in np.arange(20):
         	if Cn>Cmax:
         		self.center=center
         		Cmax=Cn
-        		print Cn, center
+        		#print Cn, center
         		center,Cn=self.Newcenter(10)
         	else: break
         
@@ -106,9 +106,23 @@ class Datas():
         r_yind=int(2*y0)-yind
         
         return sum(self.datas[xind,yind]*self.datas[r_xind,r_yind])
-                
+    
+    def LoadBasis(self):
+    	"""
+    		Look for Basis file and load it. Creation if necessary.
+    	"""
+    	
+    	return 0
+    
+    def Invert(self):
+    	"""
+    		Load Basis and do the inversion.
+    		Generate PES.
+    	"""
+    	Basis=self.LoadBasis()
+        return 0    
+
 """
-	Need the auto center methode
 	Need Invert
 	Need Save
 	Need status bar
