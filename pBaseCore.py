@@ -1,7 +1,9 @@
 import numpy as np
 import scipy as sp
 import ctypes as ct
-
+from os.path import isfile
+from scipy.ndimage.interpolation import map_coordinates as mpc
+from scipy.ndimage.interpolation import spline_filter
 from scipy.ndimage.measurements import center_of_mass as com
 import pyfits
 
@@ -16,12 +18,16 @@ class Datas():
         self.lmax=2
         self.odd=0
         self.raw=2.*np.random.normal(0.5,size=(256,256))
-        x=np.arange(0,10,0.01)
-        y=np.arange(0,10,0.01)
+        x=np.arange(0,700)
+        y=np.arange(0,500)
         X,Y=np.meshgrid(x,y)
-        self.datas=np.exp(-((X-5)**2+(Y-4)**2))
+        self.datas=np.exp(-(((X-255)/np.sqrt(2)/20.)**2+((Y-255)/np.sqrt(2)/20.)**2))
         self.center=(0.,0.)
         self.r=0.
+        
+    def get_NumberPoly(self):
+    	if not self.odd: return np.arange(0,self.lmax+1,2).shape[0]
+    	else: return np.arange(0,self.lmax+1,1).shape[0]
         
     def OpenFile(self,filepath):
         if filepath[-4:]=='.fit':
@@ -48,7 +54,7 @@ class Datas():
         mask=(self.datas>datmax*0.25)
         self.center=com(self.datas.T,mask.T)
         
-    def Symmetrize(self):
+    def Symmetrize(self,data):
         """
     		Symmetrise a 2_D circular selection vertically (ie about a horizontal axis). 
     		Assume that the centre is mid-pixel (x0,y0) rather than at lower left corner
@@ -60,7 +66,7 @@ class Datas():
     	#Need to build up the selected indexes within self.r
         xindex=np.arange(self.center[0]-self.r,self.center[0]+self.r,dtype=int)
         yindex=np.arange(self.center[1]-self.r,self.center[1]+self.r,dtype=int)
-        for k in xindex: self.datas[yindex,k]=0.5*(self.datas[yindex,k]+self.datas[yindex[::-1],k])
+        for k in xindex: data[yindex,k]=0.5*(data[yindex,k]+data[yindex[::-1],k])
         
     def AutoCenter(self):
         """
@@ -111,19 +117,143 @@ class Datas():
     	"""
     		Look for Basis file and load it. Creation if necessary.
     	"""
+    	#Build basis file name
+    	path='./BasisFiles/'
+    	if not self.odd: filenamescore=''.join(['P%i' %i for i in np.arange(0,self.lmax+1,2)])
+    	else:filenamescore=''.join(['P%i' %i for i in np.arange(0,self.lmax+1)])
+    	fileextension='.dat'
+    	Sfilename=path+'S'+filenamescore+fileextension
+    	Ufilename=path+'U'+filenamescore+fileextension
+    	Vfilename=path+'V'+filenamescore+fileextension
+    	#Generate Basis file if not existing
+    	if not (isfile(Sfilename) and isfile(Ufilename) and isfile(Vfilename)): 
+    	    print 'files missing'
+    	    return -1
     	
-    	return 0
+    	#Loading file
+    	s=np.diag(np.fromfile(Sfilename))
+    	temp=np.fromfile(Ufilename)
+    	u=temp.reshape((temp.shape[0]/s.shape[0],s.shape[0]))
+    	v=np.fromfile(Vfilename).reshape((s.shape[0],s.shape[0]))
+    	
+    	return s,u,v
     
-    def Invert(self):
+    def Invert(self,s,u,v):
     	"""
     		Load Basis and do the inversion.
     		Generate PES.
     	"""
-    	Basis=self.LoadBasis()
-        return 0    
+    	rdata=self.raw
+    	#Symmetrize the problem
+    	self.Symmetrize(rdata)
+    	data=rdata[self.center[1]-self.r:self.center[1]+self.r,self.center[0]-self.r:self.center[0]+self.r]
+    	#Convert into polar coordinates
+        rad=np.arange(256)
+        theta=np.pi*np.arange(256)/255.
+        fact=np.min(rdata.shape)/2./rad.shape[0]	#Scaling parameter
+        #x_step=rad.max()/(0.5*data.shape[0])
+        #y_step=rad.max()/(0.5*data.shape[1])
+        #print x_step,y_step
+        polar_dat=cart_to_polar(data,1./fact,1./fact,rad,theta,(0.5*data.shape[0],0.5*data.shape[0]),3)
+        polar_dat=np.nan_to_num(polar_dat)	#Otherwise there is no solution
+        """
+        	Resolve Basis*coeff=polar_dat
+        	s is diagonal of size Legendre polynioms x number of function
+        	u is orthogonal of size (Radial binning x Angular bining).(Legendre polynioms x number of function)
+        """
+        #A=np.dot(u,np.dot(s,v))
+        coefficients,res,siz,singular=np.linalg.lstsq(u,polar_dat.T.ravel())
+        #Need to build up angular distribution and PES
+        #Angular Matrix is of size NLxNR where NL is the number of Legendre polynoms and Nr the radial binning
+        angular=np.zeros((s.shape[0]/128,rad.shape[0]))
+        polradius=int(self.r/fact)
+        kvector=[np.arange(np.maximum(0,r/2-5),np.minimum(r/2+6,127)+1) for r in rad[:polradius]]
+        radfunc=[np.exp(-0.5*(i-2*j)**2) for i,j in zip(rad,kvector)]
+        NL=self.get_NumberPoly()
+        angfunc=[coefficients[i*NL+j] for i in kvector for j in np.arange(NL)]
+        angular[:,:polradius]=np.array([sum(radfunc[i]*angfunc[j::NL][i]) for i in np.arange(len(radfunc)) for j in np.arange(NL)]).reshape(NL,len(radfunc))
+        ang0=angular[0,:]
+        ind=np.where(ang0<0)[0]
+        if len(ind)>0: 
+    		ang0[ind]=0.0
+    		angular[:,ind]=0.0
+    	ind=np.where(ang0>0)[0]
+    	angular[1:,ind]/=ang0[ind]
+        pmax=(ang0*rad**2).max()
+        normed_PES=ang0*rad**2 /pmax
+        
+        return data,angular,normed_PES,fact   
+
+# Auxiliary function to map polar data to a cartesian plane
+def polar_to_cart(polar_data, theta_step, range_step, x, y, order=2):
+
+    # "x" and "y" are numpy arrays with the desired cartesian coordinates
+    # we make a meshgrid with them
+    X, Y = np.meshgrid(x, y)
+
+    # Now that we have the X and Y coordinates of each point in the output plane
+    # we can calculate their corresponding theta and range
+    Tc = np.degrees(np.arctan2(Y, X)).ravel()
+    Rc = (np.sqrt(X**2 + Y**2)).ravel()
+
+    # Negative angles are corrected
+    Tc[Tc < 0] = 360 + Tc[Tc < 0]
+
+    # Using the known theta and range steps, the coordinates are mapped to
+    # those of the data grid
+    Tc = Tc / theta_step
+    Rc = Rc / range_step
+
+    # An array of polar coordinates is created stacking the previous arrays
+    coords = np.vstack((Rc, Tc))
+
+    # To avoid holes in the 360 - 0 boundary, the last column of the data
+    # copied in the begining
+    polar_data = np.vstack((polar_data, polar_data[-1,:]))
+
+    # The data is mapped to the new coordinates
+    # Values outside range are substituted with zeros
+    filt_polar_data=spline_filter(polar_data,3)
+    cart_data = mpc(filt_polar_data, coords, order=order, mode='constant', cval=0.0)
+
+    # The data is reshaped and returned
+    return(cart_data.reshape(len(y), len(x)).T)
+
+
+# Auxiliary function to map cartesian data to a polar plane
+def cart_to_polar(cart_data, x_step, y_step, r, theta, origin, order=3):
+
+    # "r" and "t" are numpy arrays with the desired cartesian coordinates
+    # we make a meshgrid with them
+    R, T = np.meshgrid(r, theta)
+
+    # Now that we have the R and T coordinates of each point in the output plane
+    # we can calculate their corresponding theta and range
+    xind = (R*np.sin(T)).ravel()
+    yind = (R*np.cos(T)).ravel()
+
+    # Using the known x and y steps, the coordinates are mapped to
+    # those of the data grid
+    xind = origin[0]- (xind / x_step)
+    yind = origin[1]+ (yind / y_step)
+
+    # An array of polar coordinates is created stacking the previous arrays
+    coords = np.vstack((xind, yind))
+
+    # The data is mapped to the new coordinates
+    # Values outside range are substituted with nans
+    polar_data = mpc(cart_data, coords,order=order, mode='constant', cval=0.0)
+    
+    # The data is reshaped and returned
+    return(polar_data.reshape(len(theta), len(r)).T)
+
 
 """
-	Need Invert
+	To polar coordinates
+	Invert
+	---> PES sort of OK but need smoothing
+	
+	Need to build display of the inversion result
 	Need Save
 	Need status bar
 	Need stability

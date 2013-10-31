@@ -394,7 +394,7 @@ class pBaseForm(QtGui.QMainWindow):
     		symmetric along the vertical axis. (Vertically being the polarisation 
     		axis of the ligth, or the direction of propagation in the case of cpl).
     	"""
-        self.workflow.Symmetrize()
+        self.workflow.Symmetrize(self.workflow.datas)
         self.statlabel.setText("Symmetrized")
         self.display()
     
@@ -429,7 +429,11 @@ class pBaseForm(QtGui.QMainWindow):
         self.display()
     
     def InvertFn(self):
-    	self.workflow.Invert()
+    	base=self.workflow.LoadBasis()
+    	if base==-1: QtGui.QMessageBox.warning(self,"No Basis","Basis file don't exist yet !!! \n Please build it first. :(")
+    	else: 
+    		s,u,v=base
+    		self.workflow.Invert(s,u,v)
     	self.display()
     
     def changeXValue(self,value):
