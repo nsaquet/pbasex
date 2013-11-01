@@ -7,7 +7,7 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-import time
+import time,copy
 from PySide import QtCore, QtGui
 import matplotlib
 matplotlib.use('Qt4Agg')
@@ -19,6 +19,9 @@ import matplotlib.colors as colors
 from matplotlib.ticker import NullFormatter
 
 from pBaseCore import Datas
+
+waitCondition = QtCore.QWaitCondition()
+mutex = QtCore.QMutex()
 
 class PlotSettings():
     def __init__(self):
@@ -242,6 +245,8 @@ class pBaseForm(QtGui.QMainWindow):
         self.statusbar.addWidget(self.statcoordinates,2)
         self.progressBar = QtGui.QProgressBar()
         self.statusbar.addWidget(self.progressBar,2)
+        self.progressBar.setValue(0)
+        self.progressBar.setRange(0,20)
         self.progressBar.setVisible(False)
 
         self.retranslateUi(MainWindow)
@@ -401,29 +406,26 @@ class pBaseForm(QtGui.QMainWindow):
     def AutoCenterFn(self):
         if self.workflow.r==0.: self.display()
         else: 
+            self.progressBar.reset()
+            self.progressBar.setVisible(True)
             if not self.plotsettings.IsFixed: 
-                Cmax=0
-                self.progressBar.setVisible(True)
-                self.progressBar.setValue(0)
-                self.progressBar.setRange(0,20)
                 self.statlabel.setText("Centering")
-                
-                center,Cn=self.workflow.Newcenter(10)
-                for i in np.arange(20):
-        	   if Cn>Cmax:
-        		self.workflow.center=center
-        		self.progressBar.setValue(i)
-        		self.display()
-        		Cmax=Cn
-        		#print Cn, center
-        		center,Cn=self.workflow.Newcenter(10)
-        	   else: 
-        	       self.progressBar.setValue(20)
-        	       break
+                self.RunProcess()
+                while not self.process.isFinished(): QtCore.QCoreApplication.processEvents() 
             self.statlabel.setText("Centered")
             self.progressBar.setVisible(False)
             self.display()
+            
+    def RunProcess(self):
+        self.process=CenterProcesser(self)#.workflow)
+        QtCore.QObject.connect(self.process,QtCore.SIGNAL("progress(int)"),self.progressBar,QtCore.SLOT("setValue(int)"))
+        if not self.process.isRunning():
+            self.process.exiting = False
+            self.process.start()
+            
         
+        
+                
     def ICenterFn(self):
         if not self.plotsettings.IsFixed: self.workflow.get_com()
         self.display()
@@ -474,3 +476,25 @@ def cmap_xmap(function,cmap):
 def paint_circle(center,radius):
         theta=np.linspace(-np.pi,np.pi,1001)
         return center[0]+radius*np.cos(theta),center[1]+radius*np.sin(theta)
+
+class CenterProcesser(QtCore.QThread):
+    __errorHappened=False
+    def __init__(self,dat,parent=None):
+        QtCore.QThread.__init__(self,parent)
+        self.workflow=dat.workflow
+        self.gui=dat
+        self.exiting=False
+        
+    def run(self):
+        Cmax=0
+        center,Cn=self.workflow.Newcenter(10)
+        for i in np.arange(20):
+            if Cn>Cmax:
+        	self.workflow.center=center
+        	self.gui.display()
+        	self.emit(QtCore.SIGNAL("progress(int)"),i)
+        	Cmax=Cn
+        	center,Cn=self.workflow.Newcenter(10)
+            else: 
+                self.emit(QtCore.SIGNAL("progress(int)"),20)
+                break
