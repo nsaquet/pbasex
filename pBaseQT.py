@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
-
-# Form implementation generated from reading ui file 'pBaseQT.ui'
-#
 # Created: Mon Sep 30 10:02:05 2013
 #      by: pyside-uic 0.2.13 running on PySide 1.1.1
 #
-# WARNING! All changes made in this file will be lost!
+# GUI interface for pBase program with a Qt interface
+# Use some of the function build in pBaseCore 
+# Use  matplotlib for displaying images
 
-import time,copy
 from PySide import QtCore, QtGui
 import matplotlib
 matplotlib.use('Qt4Agg')
@@ -54,7 +52,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.Wplot.setObjectName("Image")
         self.LPlot.addWidget(self.canvas)
         self.Wplot.setLayout(self.LPlot)
-            # Bind the 'pick' event for clicking on one of the bars
+        # Bind the 'pick' event for clicking on one of the bars
         self.canvas.mpl_connect('button_press_event', self.on_press)
         
         #Create the Tool Box on the side
@@ -241,7 +239,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.statlabel.setText("Ready !")
         self.statusbar.addWidget(self.statlabel,1)
         self.statcoordinates = QtGui.QLabel()
-        self.statcoordinates.setText("x= , y= ")
+        self.statcoordinates.setText("Center: x= , y= ")
         self.statusbar.addWidget(self.statcoordinates,2)
         self.progressBar = QtGui.QProgressBar()
         self.statusbar.addWidget(self.progressBar,2)
@@ -315,7 +313,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.YSlider.setValue(self.workflow.center[1])
         palette=cm.get_cmap(self.plotsettings.palette)
         if self.plotsettings.IsSqrt: palette=cmap_xmap(lambda x: x**2,palette)
-        self.axes.imshow(self.workflow.datas,extent=[0,ymax,0,xmax],origin='lower',cmap=palette)
+        self.axes.imshow(self.workflow.datas,extent=[0,ymax,0,xmax],origin='lower',cmap=palette,vmax=0.8*self.workflow.datas.max())
         
         if self.workflow.r!=0.:
             xc,yc= paint_circle(self.workflow.center,self.workflow.r)
@@ -330,6 +328,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.axes.tick_params(bottom='off',top='off',left='off',right='off')
         self.canvas.draw()
         del palette
+        self.statcoordinates.setText("Center: x=%i , y=%i"%self.workflow.center)
         
     def OnChooseCM(self,text):
         """
@@ -421,10 +420,7 @@ class pBaseForm(QtGui.QMainWindow):
         QtCore.QObject.connect(self.process,QtCore.SIGNAL("progress(int)"),self.progressBar,QtCore.SLOT("setValue(int)"))
         if not self.process.isRunning():
             self.process.exiting = False
-            self.process.start()
-            
-        
-        
+            self.process.start() 
                 
     def ICenterFn(self):
         if not self.plotsettings.IsFixed: self.workflow.get_com()
@@ -469,8 +465,6 @@ def cmap_xmap(function,cmap):
         cdict[key] = map(function_to_map, cdict[key])
         cdict[key].sort()
         assert (cdict[key][0]<0 or cdict[key][-1]>1), "Resulting indices extend out of the [0, 1] segment."
-
-
     return colors.LinearSegmentedColormap('colormap',cdict,1024)
 
 def paint_circle(center,radius):
@@ -479,10 +473,10 @@ def paint_circle(center,radius):
 
 class CenterProcesser(QtCore.QThread):
     __errorHappened=False
-    def __init__(self,dat,parent=None):
+    def __init__(self,gui,parent=None):
         QtCore.QThread.__init__(self,parent)
-        self.workflow=dat.workflow
-        self.gui=dat
+        self.workflow=gui.workflow
+        self.gui=gui
         self.exiting=False
         
     def run(self):
@@ -498,3 +492,4 @@ class CenterProcesser(QtCore.QThread):
             else: 
                 self.emit(QtCore.SIGNAL("progress(int)"),20)
                 break
+

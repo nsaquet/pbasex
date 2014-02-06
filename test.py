@@ -14,9 +14,3 @@ if __name__ == "__main__":
     pBase = MainWindow()
     pBase.show()
     sys.exit(app.exec_())
-    
-    
-    
-    """
-    compile library for 32bits and 34 bits arch by adding -arch i386 -arch x86_64
-    """
