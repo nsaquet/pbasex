@@ -1,7 +1,8 @@
 /*
     Filename: core_basis.c
-    To be used with pBaseCore.py, as an imported library. Use gcc to compile.
-    gcc -shared -Wall -o libCoreBasis.so -fPIC core_basis.c /Developer/extralibs/lib/libgsl.a /Developer/extralibs/lib/libgslcblas.a -I/Developer/extralibs/include/ -arch i386 -arch x86_64
+    So far this is a standalone application for generating basis.
+    g++ -O4 -Wall -o makebasis.exe core_basis.cpp /Developer/usr/lib/libgsl.a /Developer/usr/lib/libgslcblas.a -I/Developer/usr/include/
+
 */
 #include <time.h>
 #include <math.h>
@@ -15,9 +16,12 @@
 
 using namespace std;
 
-#define NR 256 // Radial binning 256
-#define NTH 256 // Angular binning (180 degrees) 256
-#define NK 128 // Number of basis functions 128
+//Gustavo is using a 440 by 440 matrix
+#define NR 440 // Radial binning 256
+#define NTH 440 // Angular binning (180 degrees) 256
+#define NK 220 // Number of basis functions 128
+#define BSPACE	2.0
+#define BWIDTH	1.0
 
 /* Function prototypes */
 extern "C" float lpoly(float,float *,int);
@@ -37,28 +41,47 @@ double model_f(double r,void *par)
   double theta_f(double,double);
   double thta=theta_f(r,xz[1]);
   double R=r/sin(thta),f;
-  int k=(int)xz[2]*2; //change for different pixel widths
+  double k0=xz[2]; //change for different pixel widths
   int l=(int)xz[3];
+  double width=xz[4];
 
   pl=(float*)calloc(l+1,sizeof(float));
 
-  f=exp(-(R-k)*(R-k)/2.0);
+  f=exp(-(R-k0)*(R-k0)/width);
   f*=lpoly(thta,pl,l);
   free(pl);
 
   return f*r/sqrt(r*r-xz[0]*xz[0]);
 }
 
-double model_c(int k,int l,double x,double z,gsl_integration_workspace *w)
+double model_c(double k,int l,double x,double z,double width, gsl_integration_workspace *w)
 {
-  double par[4]={x,z,k,l};
+  double par[5]={x,z,k,l,width};
   gsl_function f;
   //size_t neval;
+  int status;
+  double epsrel;
+  epsrel=0.00005;
   double error,result;
   f.function=&model_f;
   f.params=&par;
-  gsl_integration_qag(&f,fabs(x),300.0,0.00001,0.00005,100000,6,w,&result,&error);
-  return result;
+  while(1)
+  {
+    status=gsl_integration_qag(&f,fabs(x),NR+50.,0.0,epsrel,100000,6,w,&result,&error);
+    switch(status)
+    {
+        case 0:
+            return result;
+            break;
+        case GSL_EFAILED:
+        case GSL_EROUND:
+            epsrel*=1.2;
+            break;
+        default:
+            return result;
+            break;
+    }
+  }
 }
 
 /* Return Legendre polynomial at X */
@@ -109,10 +132,12 @@ double theta_f(double x,double y)
 
 void write_forward(int l,int odd)
 {
-  int ir,it,ik,il,nl,basis_index,point_index,NL,N,M,i;
-  double p,dx,dz,thta,rad;
+  int ir,it,ik,il,nl,basis_index,point_index,NL,N,M,i,nth;
+  double p,dx,dz,thta,rad,space,width,sigma,k0;
+  space=BSPACE;
+  sigma=BWIDTH;
   float cpu1,cpu0;
-  gsl_matrix *Basis,*BasisT,*V,*X;
+  gsl_matrix *Basis,*V,*X;
   gsl_integration_workspace *w=gsl_integration_workspace_alloc(100000); // Allocate space for integration
   gsl_vector *W,*S;
   FILE *fs,*fu,*fv;
@@ -122,26 +147,33 @@ void write_forward(int l,int odd)
   else NL=l/2+1;
   N=NL*NK;
   M=NR*NTH;
-  Basis=gsl_matrix_alloc(N,M); //Allocate Basis matrix
+  Basis=gsl_matrix_alloc(M,N); //Allocate Basis matrix
   if (Basis==NULL){
     printf("Couldn't allocate memory for basis functions\n");
     exit(0);
   }
+  
+  gsl_set_error_handler_off(); // I will take care of integration errors myself
+  
+  width=2*sigma*sigma;
   for(ik=0;ik<NK;ik++){
     for(il=0;il<NL;il++){
       basis_index=ik*NL+il;     
       cpu0=(float)clock()/(float)CLOCKS_PER_SEC;
       if(odd) nl=il;
       else nl=il*2;
+      point_index=0;
       for(ir=0;ir<NR;ir++){
-	    for(it=0;it<NTH;it++){
-	        point_index=ir*NTH+it;
+	    nth=2*ir+1;
+	    for(it=0;it<nth;it++){
 	        rad=(double)ir;
-	        thta=it/(double)(NTH-1)*M_PI;
+	        thta=(double)it/(double)(nth)*M_PI;
 	        dx=rad*sin(thta);
 	        dz=rad*cos(thta);
-	        p=model_c(ik,nl,dx,dz,w);
+	        k0=ik*space;
+	        p=model_c(k0,nl,dx,dz,width,w);
 	        gsl_matrix_set(Basis,basis_index,point_index,p);
+	        point_index++;
 	        }
         }
       cpu1=(float)clock()/(float)CLOCKS_PER_SEC;
@@ -155,12 +187,6 @@ void write_forward(int l,int odd)
   /***********************/
   /* Decomposition stuff */
   /***********************/
-
-  /* Transpose it */
-
-  BasisT=gsl_matrix_alloc(M,N);
-  gsl_matrix_transpose_memcpy(BasisT,Basis);
-  gsl_matrix_free(Basis);
   
   /*Allocate working space for decomposition */
 
@@ -170,7 +196,7 @@ void write_forward(int l,int odd)
   X=gsl_matrix_alloc(N,N);
 
   /* Decompose */
-  gsl_linalg_SV_decomp_mod(BasisT,X,V,S,W);
+  gsl_linalg_SV_decomp_mod(Basis,X,V,S,W);
   gsl_matrix_free(X);
   gsl_vector_free(W);
 
@@ -208,8 +234,8 @@ void write_forward(int l,int odd)
   /* Write everything to file */
 
   fu=fopen(fileU,"w");
-  gsl_matrix_fwrite(fu,BasisT);
-  gsl_matrix_free(BasisT);
+  gsl_matrix_fwrite(fu,Basis);
+  gsl_matrix_free(Basis);
   fclose(fu);
 
   fv=fopen(fileV,"w");
@@ -222,4 +248,11 @@ void write_forward(int l,int odd)
   gsl_vector_free(S);
   fclose(fs);
   
+}
+
+int main ()
+{
+	write_forward(2,0);
+	write_forward(4,0);
+	return 0;
 }
