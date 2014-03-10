@@ -4,7 +4,7 @@ from os.path import isfile
 from scipy.ndimage.interpolation import map_coordinates as mpc
 from scipy.ndimage.interpolation import spline_filter
 from scipy.ndimage.measurements import center_of_mass as com
-import pyfits
+from numpy.polynomial.legendre import legval
 
 """
 	Definition of constants that are linked to the calculated basis set
@@ -33,8 +33,8 @@ class ArrayInfos():
 	def update_nR(self):
 		nr=min(0.5*self.Xfact*(self.nX-1)/self.Rfact,0.5*self.Yfact*(self.nY-1)/self.Rfact)
 		if nr>Rbin:
+			self.Rfact=nr/float(Rbin)
 			nr=Rbin
-			self.Rfact*=nr/float(Rbin)
 		self.nR=int(nr)
 
 """
@@ -56,15 +56,28 @@ class Datas():
         self.lmax=2
         self.odd=0
         self.raw=2.*np.random.normal(0.5,size=(256,256))
-        x=np.arange(0,700)
+        #Simulate a ring image
+        x=np.arange(0,500)
         y=np.arange(0,500)
-        X,Y=np.meshgrid(x,y)
-        self.datas=np.exp(-(((X-255)/np.sqrt(2)/20.)**2+((Y-205)/np.sqrt(2)/20.)**2))
+        X,Y=np.meshgrid(x,y) #Create a 2d map
+        X-=250 #Center the ring
+        Y-=250 #Center the ring
+        self.theta=theta_f(X,Y)
+        r=np.sqrt(X**2+Y**2)
+        self.datas=np.exp(-(r-80)**2/50)*legval(np.cos(self.theta),[1,0,1])
+        self.datas/=self.datas.max()
+        self.raw=self.datas
+    
         self.center=(0.,0.)
         self.get_com()
-        self.r=10.
+        self.r=100.
         self.scale=ArrayInfos(self.datas)
         
+        #Output
+        self.normed_pes=np.zeros(Rbin)
+        self.ang=np.zeros((Angbin,self.get_NumberPoly()))
+        
+    
     def get_NumberPoly(self):
     	if not self.odd: return np.arange(0,self.lmax+1,2).shape[0]
     	else: return np.arange(0,self.lmax+1,1).shape[0]
@@ -99,6 +112,18 @@ class Datas():
             self.get_com()
             self.scale=ArrayInfos(self.datas)
         else: print "Incorrect data file format"
+        
+    def SaveFileFits(self,filepath):
+    	hdu_pes=pyfits.PrimaryHDU(zip(np.arange(self.normed_pes.shape[0]),self.normed_pes))
+    	hdu_ang=pyfits.PrimaryHDU(self.normed_ang)
+    	col1=pyfits.Column(name='Max Legendre',format='E',array=np.array([self.l]))
+    	col2=pyfits.Column(name='Image Center',format='E',array=np.array([self.center]))
+    	col3=pyfits.Column(name='Selection radius',format='E',array=np.array([self.r]))
+        col4=pyfits.Column(name='odd',format='E',array=np.array([self.odd]))
+        cols=pyfits.ColDefs([col1,col4,col2,col3])
+        tbhdu=pyfits.new_table(cols)
+        hdulist=pyfits.HDUList([hdu_pes,hdu_ang,tbhdu])
+        hdulist.writeto(filepath)
         
     def get_com(self):
         datmax=self.datas.max()
@@ -184,9 +209,9 @@ class Datas():
     	    return -1
     	
     	#Loading file as a vector as in PBaseX.
-    	M=440*440   #correspond to the polar array dimension in the basis file NR=440 NTH=440
-    	N=self.get_NumberPoly()*220 #Number of polynoms by the number of function set to NR/2.
-    	u=np.fromfile(Ufilename,dtype=float64).reshape((M,N))
+    	M=Rbin*Angbin  #correspond to the polar array dimension in the basis file NR=440 NTH=440
+    	N=self.get_NumberPoly()*Funcnumber #Number of polynoms by the number of function set to NR/2.
+    	u=np.fromfile(Ufilename,dtype=np.float64).reshape((M,N))
     	
     	return u
     
@@ -197,20 +222,20 @@ class Datas():
     	"""
     	rdata=self.raw
     	#Symmetrize the problem
-    	self.Symmetrize(rdata)
+    	#self.Symmetrize(rdata)
     	
     	#Convert into polar coordinates
-        polar,rad_dist =cart2pol(rdata,self.scale,self.center)
-        polar_dat=np.concatenate((polar,np.zeros(u.shape[0]-len(polar),dtype=polar.dtype)))
+        polar =cart2pol(rdata,self.scale,self.center,self.r)
+        #polar_dat=np.concatenate((polar,np.zeros(u.shape[0]-len(polar),dtype=polar.dtype)))
         
         
         #Resolve Basis*coeff=polar_dat
-        coefficients,residuts,siz,singulars=np.linalg.lstsq(u,polar_dat)       #Need to build up angular distribution and PES
-        
+        coefficients,residuts,siz,singulars=np.linalg.lstsq(u,polar)       #Need to build up angular distribution and PES
+                
         width=2*Bwidth**2
-        irmax=int((self.r/self.scale.Rfact)**2 /self.scale.nR )
-        if irmax>Rbin: irmax=Rbin
-        rad=np.sqrt(np.arange(irmax)*self.scale.nR*1.)
+        #irmax=min(int((self.r/self.scale.Rfact)**2 /self.scale.nR ),Rbin)
+        #if irmax>Rbin: irmax=Rbin
+        rad=np.arange(Rbin)#np.sqrt(np.arange(irmax)*self.scale.nR*1.)
         kvector=np.arange(Funcnumber)
         
         #Angular Matrix is of size NLxNR where NL is the number of Legendre polynoms and Nr the radial binning
@@ -220,32 +245,10 @@ class Datas():
         
         
         for r in rad:
-            fradial=np.exp(-(r-Bspace*kvector)**2/width)
+            fradial=np.exp(-(r*Rbin/float(self.r)-Bspace*kvector)**2/width)
             for l in np.arange(NL):
-                angular[l][r]=sum(fradial*coefficients[l::NL])
+                angular[l][r]=sum(fradial*coefs[:,l])
         
-        ang0=angular[0,:]
-        ind=np.where(ang0<0)[0]
-        if len(ind)>0: 
-    		ang0[ind]=0.0
-    		angular[:,ind]=0.0
-    	ind=np.where(ang0>0)[0]
-    	#angular[1:,ind]/=ang0[ind]
-        #pmax=(ang0*rad**2).max()
-        normed_PES=ang0#*rad**2 /pmax
-        
-        return normed_PES 
-        """
-        #polradius=int(self.r/fact)
-        #kvector=[np.arange(np.maximum(0,r/2-5),np.minimum(r/2+6,127)) for r in rad[:polradius]]
-        radfunc=[np.exp(-0.5*(i-2*j)**2) for i,j in zip(rad,kvector)]
-        
-        
-        
-        for i,r in enumerate(radfunc):
-            angular[:,i]=np.sum(r*coefs[:,kvector[i]],axis=1)
-        #angfunc=[coefficients[i*NL+j] for i in kvector for j in np.arange(NL)]
-        #angular[:,:polradius]=np.array([sum(radfunc[i]*angfunc[j::NL][i]) for i in np.arange(len(radfunc)) for j in np.arange(NL)]).reshape(NL,len(radfunc))
         ang0=angular[0,:]
         ind=np.where(ang0<0)[0]
         if len(ind)>0: 
@@ -254,84 +257,146 @@ class Datas():
     	ind=np.where(ang0>0)[0]
     	angular[1:,ind]/=ang0[ind]
         pmax=(ang0*rad**2).max()
-        normed_PES=ang0*rad**2 /pmax
+        self.normed_pes=ang0*rad**2 /pmax
+        self.ang=angular
         
-        return data,polar_dat,normed_PES,fact,ang0 
-        """
-# Auxiliary function to map polar data to a cartesian plane
-def polar_to_cart(polar_data, theta_step, range_step, x, y, order=3):
+        
 
-    # "x" and "y" are numpy arrays with the desired cartesian coordinates
-    # we make a meshgrid with them
-    X, Y = np.meshgrid(x, y)
-
-    # Now that we have the X and Y coordinates of each point in the output plane
-    # we can calculate their corresponding theta and range
-    Tc = np.degrees(np.arctan2(Y, X)).ravel()
-    Rc = (np.sqrt(X**2 + Y**2)).ravel()
-
-    # Negative angles are corrected
-    Tc[Tc < 0] = 360 + Tc[Tc < 0]
-
-    # Using the known theta and range steps, the coordinates are mapped to
-    # those of the data grid
-    Tc = Tc / theta_step
-    Rc = Rc / range_step
-
-    # An array of polar coordinates is created stacking the previous arrays
-    coords = np.vstack((Rc, Tc))
-
-    # To avoid holes in the 360 - 0 boundary, the last column of the data
-    # copied in the begining
-    polar_data = np.vstack((polar_data, polar_data[-1,:]))
-
-    # The data is mapped to the new coordinates
-    # Values outside range are substituted with zeros
-    filt_polar_data=spline_filter(polar_data,order)
-    cart_data = mpc(polar_data, coords, order=order, mode='constant', cval=0.0)
-
-    # The data is reshaped and returned
-    return(cart_data.reshape(len(y), len(x)).T)
 
 # Auxiliary function to map cartesian data to a polar plane
-def cart_to_polar(cart_data, x_step, y_step, r, theta, origin, order=3):
-
-    # "r" and "t" are numpy arrays with the desired cartesian coordinates
-    # we make a meshgrid with them
-    R, T = np.meshgrid(r, theta)
-
-    # Now that we have the R and T coordinates of each point in the output plane
-    # we can calculate their corresponding theta and range
-    xind = (R*np.sin(T)).ravel()
-    yind = (R*np.cos(T)).ravel()
-
-    # Using the known x and y steps, the coordinates are mapped to
-    # those of the data grid
-    xind = origin[0]- (xind / x_step)
-    yind = origin[1]+ (yind / y_step)
-
-    # An array of polar coordinates is created stacking the previous arrays
-    coords = np.vstack((xind, yind))
-
-    # The data is mapped to the new coordinates
-    # Values outside range are substituted with nans
-    filt_cart_data=spline_filter(cart_data,2)
-    polar_data = mpc(filt_cart_data, coords,order=order, mode='constant', cval=0.0)
-    
-    # The data is reshaped and returned
-    return(polar_data.reshape(len(theta), len(r)).T)
-
 #Change to G. Garcia function from IGOR
-def cart2pol(data,scale,center):
-	Rfact=scale.Rfact
-	nR=scale.nR
+def cart2pol(data,scale,center,r):
+
+	"""
+		Cubic interpolation
+		Fastest implementation of the cubic interpolation so far for an array
+	"""
+	def cubic(y):
+		p0=(y+2)**3
+    		p0[p0<0]=0
+    		p1 = (y+1)**3
+    		p1[p1<0]=0
+    		p2 = y**3
+    		p2[p2<0]=0
+    		p3 =(y-1)**3
+    		p3[p3<0]=0
+    		return (p0-4.*p1+6.*p2-4.*p3)/6.
 	
-	if nR>Rbin: nr=Rbin #Security
+	"""
+		Adapt the  selected area size to polar basis size
+	"""
+	nR=min(r,scale.nR)
+	if nR>Rbin: nR=Rbin #Security
+	
+	Rfact=nR/float(Rbin)
+	scale.Rfact=Rfact
+	
+	polar=np.array([])
+	
+	rad=Rfact*np.concatenate([r*np.ones(2*r+1) for r in np.arange(Rbin)])
+	theta=np.concatenate([np.pi*np.arange(t)/t for t in 2*np.arange(Rbin)+1])
+	x=rad*np.cos(theta) + center[1]
+	y=-rad*np.sin(theta) + center[0]
+	#Cubic interpolation
+	xpix=x/scale.Xfact
+	ypix=y/scale.Yfact
+	ix=xpix.astype('int')
+	iy=ypix.astype('int')
+	dx=xpix-ix
+	dy=ypix-iy
+	polar=np.zeros_like(rad)
+	
+	i,j=np.meshgrid(np.arange(-1,3),np.arange(-1,3))
+	i=i.ravel()
+	j=j.ravel()
+	I,IX=np.meshgrid(i,ix)
+	J,IY=np.meshgrid(i,iy)
+	IXI=IX+I
+	IYJ=IY+J
+	rule1=(IXI<scale.nX) & (IXI>=0)
+	rule2=(IYJ<scale.nY) & (IYJ>=0)
+	cub=cubic(I-dx.reshape((dx.shape[0],1)))*cubic(dy.reshape((dy.shape[0],1))-J)
+	dat=data.ravel()[(IXI*scale.nY+IYJ).ravel()].reshape(IYJ.shape)
+	polar+=(dat*cub).sum(axis=1)
+	return polar
+
+
+def theta_f(x,y):
+	ang=np.arctan(np.fabs(x)/np.fabs(y))
+	#Check for singularity and remap angles over [0 2pi]
+	indx=np.where(np.ravel(x)==0)[0]
+	indy=np.where(np.ravel(y)==0)[0]
+	np.ravel(ang)[np.intersect1d(indx,indy)]=2.*np.pi
+	
+	indx=np.where(np.ravel(x)==0)[0]
+	indy=np.where(np.ravel(y)>0)[0]
+	np.ravel(ang)[np.intersect1d(indx,indy)]=0.
+	
+	indx=np.where(np.ravel(x)==0)[0]
+	indy=np.where(np.ravel(y)<0)[0]
+	np.ravel(ang)[np.intersect1d(indx,indy)]=np.pi
+	
+	indx=np.where(np.ravel(x)>0)[0]
+	indy=np.where(np.ravel(y)==0)[0]
+	np.ravel(ang)[np.intersect1d(indx,indy)]=np.pi/2.
+	
+	indx=np.where(np.ravel(x)<0)[0]
+	indy=np.where(np.ravel(y)==0)[0]
+	np.ravel(ang)[np.intersect1d(indx,indy)]=3.*np.pi/2.
+	
+	indx=np.where(np.ravel(x)<0)[0]
+	indy=np.where(np.ravel(y)<0)[0]
+	np.ravel(ang)[np.intersect1d(indx,indy)]+=np.pi
+	
+	indx=np.where(np.ravel(x)<0)[0]
+	indy=np.where(np.ravel(y)>0)[0]
+	np.ravel(ang)[np.intersect1d(indx,indy)]*=-1
+	np.ravel(ang)[np.intersect1d(indx,indy)]+=2.*np.pi
+	
+	indx=np.where(np.ravel(x)>0)[0]
+	indy=np.where(np.ravel(y)<0)[0]
+	np.ravel(ang)[np.intersect1d(indx,indy)]*=-1
+	np.ravel(ang)[np.intersect1d(indx,indy)]+=np.pi
+	return ang
+    
+"""
+	Need to build display of the inversion result
+	Need Save
+	Need status bar
+	Need stability
+"""
+
+
+
+
+#Old function slow but working
+"""
+def cart2pol_old(data,scale,center,r):
+		#Cubic interpolation
+		#Fastest implementation of the cubic interpolation so far
+		#Faster than max(0,(x+1)**3) by 20% or any of the factorization by bool (x+2>0) by 60-65%
+	def cubic(x):
+		p0=lambda y: (y+2)**3 if (y+2>0) else 0
+		p1=lambda y: (y+1)**3 if (y+1>0) else 0
+		p2=lambda y: (y)**3 if (y>0) else 0
+		p3=lambda y: (y-1)**3 if (y-1>0) else 0
+		return (p0(x)-4*p1(x)+6*p2(x)-4*p3(x))/6.
+	
+	
+	#Adapt the  selected area size to polar basis size
+	
+	nR=min(r,scale.nR)
+	if nR>Rbin: nR=Rbin #Security
+	
+	Rfact=nR/float(Rbin)
+	scale.Rfact=Rfact
+	print Rfact
 	polar=np.array([])
 	rfunc=[]
-	for l in np.arange(nR):
+	
+	#Calculate the polar map
+	for l in np.arange(Rbin):
 		nth=2*l+1	#define a r dependant angular binning 
-		
 		rad=l*Rfact	#Radius in image unit
 		
 		theta=np.pi*np.arange(nth)/nth
@@ -348,71 +413,17 @@ def cart2pol(data,scale,center):
 		
 		Pol=np.zeros_like(theta)
 		
-		"""
-			Fastest implementation of the cubic interpolation so far
-			Faster than max(0,(x+1)**3) by 20% or any of the factorization by bool (x+2>0) by 60-65%
-		"""
-		def cubic(x):
-			p0=lambda y: (y+2)**3 if (y+2>0) else 0
-			p1=lambda y: (y+1)**3 if (y+1>0) else 0
-			p2=lambda y: (y)**3 if (y>0) else 0
-			p3=lambda y: (y-1)**3 if (y-1>0) else 0
-			return (p0(x)-4*p1(x)+6*p2(x)-4*p3(x))/6.
 		for index in np.arange(nth):
 			for i in np.arange(-1,3):
 				for j in np.arange(-1,3):
 					condx=np.logical_and((ix[index]+i)<scale.nX,(ix[index]+i)>=0)
 					condy=np.logical_and((iy[index]+j)<scale.nY,(iy[index]+j)>=0)
-					cub=cubic(i-dx[index])*cubic(dy[index]-j)*np.logical_and(condx,condy)
-					#print i-dx[index],cubic(i-dx[index]) ,cub
-					Pol[index]+=data.ravel()[(ix[index]+i)*scale.nY+(iy[index]+j)]*cub	
+					if np.logical_and(condx,condy):
+						cub=cubic(i-dx[index])*cubic(dy[index]-j)
+						#print i-dx[index],cubic(i-dx[index]) ,cub
+						Pol[index]+=data.ravel()[(ix[index]+i)*scale.nY+(iy[index]+j)]*cub	
+					
 		polar=np.concatenate((polar,Pol))
 		rfunc.append(Pol.sum()/Pol.shape[0])
 	return polar,rfunc
-    
 """
-	To polar coordinates
-	Invert
-	---> PES sort of OK but need smoothing
-	
-	Need to build display of the inversion result
-	Need Save
-	Need status bar
-	Need stability
-"""
-def testinvert(coef):
-	r=250
-	deltar=1.
-	nR=383.
-	NL=2
-	pmax=0.
-	width=2.*(Bwidth**2)
-	irmax=round((r/deltar)**2/nR)
-	angular=np.zeros((NL,irmax),dtype='float')
-	pes=np.zeros((irmax),dtype='float')
-	
-	print angular.shape
-	for ir in np.arange(irmax):
-		rad=np.sqrt(ir*nR)
-		kmin=0#max(0,int(rad/Bspace)-5)
-		kmax=Funcnumber#min(Funcnumber,int(rad/Bspace)+6)
-		for ik in np.arange(kmin,kmax):
-			func=np.exp(-(rad-ik*Bspace)**2 /width)
-			for il in np.arange(NL):
-				angular[il][ir]+=coef[ik*NL+il]*func
-		a0=angular[0][ir]
-		
-		if a0<=0.: 
-			a0=0.
-			for il in np.arange(NL):
-				angular[il][ir]=0.
-		else:
-			for il in np.arange(1,NL):
-				angular[il][ir]/=a0
-		
-		if a0*rad>pmax: pmax=a0*rad
-		pes[ir]=a0*rad
-	
-	return angular,pes/pmax
-		
-	

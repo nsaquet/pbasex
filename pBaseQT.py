@@ -431,7 +431,7 @@ class pBaseForm(QtGui.QMainWindow):
     	if base==-1: QtGui.QMessageBox.warning(self,"No Basis","Basis file don't exist yet !!! \n Please build it first. :(")
     	else: 
     		s,u,v=base
-    		self.workflow.Invert(s,u,v)
+    		self.workflow.Invert(u)
     	self.display()
     
     def changeXValue(self,value):
