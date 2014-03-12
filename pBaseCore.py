@@ -1,10 +1,10 @@
 import numpy as np
 import scipy as sp
+import pyfits
 from os.path import isfile
-from scipy.ndimage.interpolation import map_coordinates as mpc
-from scipy.ndimage.interpolation import spline_filter
 from scipy.ndimage.measurements import center_of_mass as com
 from numpy.polynomial.legendre import legval
+from scipy.special import eval_legendre
 
 """
 	Definition of constants that are linked to the calculated basis set
@@ -60,12 +60,14 @@ class Datas():
         x=np.arange(0,500)
         y=np.arange(0,500)
         X,Y=np.meshgrid(x,y) #Create a 2d map
+        r=np.sqrt(X**2+Y**2)
         X-=250 #Center the ring
         Y-=250 #Center the ring
-        self.theta=theta_f(X,Y)
+        theta=theta_f(X,Y)
         r=np.sqrt(X**2+Y**2)
-        self.datas=np.exp(-(r-80)**2/50)*legval(np.cos(self.theta),[1,0,1])
+        self.datas=np.exp(-(r-80)**2/50)*legval(np.cos(theta),[0,0,1])
         self.datas/=self.datas.max()
+        #self.datas[self.datas<0.]=0.
         self.raw=self.datas
     
         self.center=(0.,0.)
@@ -76,6 +78,7 @@ class Datas():
         #Output
         self.normed_pes=np.zeros(Rbin)
         self.ang=np.zeros((Angbin,self.get_NumberPoly()))
+        self.output=np.zeros_like(self.datas)
         
     
     def get_NumberPoly(self):
@@ -114,16 +117,16 @@ class Datas():
         else: print "Incorrect data file format"
         
     def SaveFileFits(self,filepath):
-    	hdu_pes=pyfits.PrimaryHDU(zip(np.arange(self.normed_pes.shape[0]),self.normed_pes))
-    	hdu_ang=pyfits.PrimaryHDU(self.normed_ang)
-    	col1=pyfits.Column(name='Max Legendre',format='E',array=np.array([self.l]))
-    	col2=pyfits.Column(name='Image Center',format='E',array=np.array([self.center]))
-    	col3=pyfits.Column(name='Selection radius',format='E',array=np.array([self.r]))
-        col4=pyfits.Column(name='odd',format='E',array=np.array([self.odd]))
-        cols=pyfits.ColDefs([col1,col4,col2,col3])
-        tbhdu=pyfits.new_table(cols)
-        hdulist=pyfits.HDUList([hdu_pes,hdu_ang,tbhdu])
-        hdulist.writeto(filepath)
+    	hdu_pes=pyfits.ImageHDU(np.array([np.arange(self.normed_pes.shape[0]),self.normed_pes]))
+    	hdu_ang=pyfits.ImageHDU(self.ang)
+    	hdu_out=pyfits.PrimaryHDU(self.output)
+    	col1=pyfits.Column(name='Max Legendre',format='I',array=np.array([self.lmax]))
+    	col2=pyfits.Column(name='Image Center',format='2I',array=np.array(self.center))
+    	col3=pyfits.Column(name='Selection radius',format='I',array=np.array([self.r]))
+        col4=pyfits.Column(name='odd',format='I',array=np.array([self.odd]))
+        tbhdu=pyfits.new_table([col1,col4,col2,col3])#, tbtype='TableHDU')
+        hdulist=pyfits.HDUList([hdu_out,hdu_pes,hdu_ang,tbhdu])
+        hdulist.writeto(filepath,clobber=True)
         
     def get_com(self):
         datmax=self.datas.max()
@@ -215,35 +218,22 @@ class Datas():
     	
     	return u
     
-    def Invert(self,u):
-    	"""
-    		Load Basis and do the inversion.
-    		Generate PES.
-    	"""
-    	rdata=self.raw
-    	#Symmetrize the problem
-    	#self.Symmetrize(rdata)
+    def to_polar(self,data):
+    	return cart2pol(data,self.scale,self.center,self.r)
     	
-    	#Convert into polar coordinates
-        polar =cart2pol(rdata,self.scale,self.center,self.r)
-        #polar_dat=np.concatenate((polar,np.zeros(u.shape[0]-len(polar),dtype=polar.dtype)))
-        
-        
+    def Invert(self,polar,u):
         #Resolve Basis*coeff=polar_dat
-        coefficients,residuts,siz,singulars=np.linalg.lstsq(u,polar)       #Need to build up angular distribution and PES
-                
+        self.coefficients,residuts,siz,singulars=np.linalg.lstsq(u,polar)       #Need to build up angular distribution and PES
+                        
         width=2*Bwidth**2
-        #irmax=min(int((self.r/self.scale.Rfact)**2 /self.scale.nR ),Rbin)
-        #if irmax>Rbin: irmax=Rbin
-        rad=np.arange(Rbin)#np.sqrt(np.arange(irmax)*self.scale.nR*1.)
+        rad=np.arange(Rbin)
         kvector=np.arange(Funcnumber)
         
         #Angular Matrix is of size NLxNR where NL is the number of Legendre polynoms and Nr the radial binning
         NL=self.get_NumberPoly()
         angular=np.zeros((NL,Angbin),dtype='float')
-        coefs=coefficients.reshape((Funcnumber,NL))
-        
-        
+        coefs=self.coefficients.reshape((Funcnumber,NL))
+
         for r in rad:
             fradial=np.exp(-(r*Rbin/float(self.r)-Bspace*kvector)**2/width)
             for l in np.arange(NL):
@@ -259,9 +249,30 @@ class Datas():
         pmax=(ang0*rad**2).max()
         self.normed_pes=ang0*rad**2 /pmax
         self.ang=angular
+    
+    def image_for_display(self):
+    	dim=int(1.1*self.r)
+    	#Calculate new image in cartesian coordinates and return it for display
+    	X,Y=np.meshgrid(np.arange(-dim,dim+1),np.arange(-dim,dim+1))
+    	new_r=np.sqrt(X**2+Y**2).ravel()
+    	new_t=theta_f(X,Y).ravel()
         
-        
-
+        #List of legendre polynoms
+        listLegendre=np.arange(0,self.lmax+1,(not self.odd)+1)
+        kvec,list=np.meshgrid(np.arange(Funcnumber),listLegendre)
+        kvector=kvec.T.ravel()
+        ListL=list.T.ravel()
+        K,Rad=np.meshgrid(kvector,new_r)
+        K,Theta=np.meshgrid(kvector,new_t)
+            	
+    	Rad*=Rbin/float(self.r)
+    	func=np.exp(-(Rad-K*Bspace)**2/(2*Bwidth**2))
+    	leg=eval_legendre(ListL,np.cos(Theta))*self.coefficients
+    	    	
+    	outdata=(func*leg).sum(axis=1)*new_r
+    	outdata[outdata<0]=0
+    	self.output=np.zeros_like(self.raw)
+        self.output[self.center[1]-dim:self.center[1]+dim+1,self.center[0]-dim:self.center[0]+dim+1]=outdata.reshape((2*dim+1,2*dim+1))	
 
 # Auxiliary function to map cartesian data to a polar plane
 #Change to G. Garcia function from IGOR

@@ -6,17 +6,19 @@
 # Use some of the function build in pBaseCore 
 # Use  matplotlib for displaying images
 
+import os
 from PySide import QtCore, QtGui
 import matplotlib
 matplotlib.use('Qt4Agg')
 import numpy as np
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigCanvas
 from matplotlib.figure import Figure
+import matplotlib.gridspec as gridspec
 import matplotlib.cm as cm
 import matplotlib.colors as colors
 from matplotlib.ticker import NullFormatter
 
-from pBaseCore import Datas
+from pBaseCore import Datas,theta_f
 
 waitCondition = QtCore.QWaitCondition()
 mutex = QtCore.QMutex()
@@ -47,8 +49,11 @@ class pBaseForm(QtGui.QMainWindow):
         self.fig = Figure((6., 6.), dpi=150)
         self.canvas = FigCanvas(self.fig)
         self.canvas.setParent(self.Wplot)
-        self.axes=self.fig.add_subplot(111)
-        self.fig.tight_layout(pad=0.1)
+        gs=gridspec.GridSpec(2,1,height_ratios=[4,1])
+        gs.update(hspace=0.05)
+        self.axes=self.fig.add_subplot(gs[0])
+        self.axesPES=self.fig.add_subplot(gs[1])
+        gs.tight_layout(self.fig,pad=0.1)
         self.Wplot.setObjectName("Image")
         self.LPlot.addWidget(self.canvas)
         self.Wplot.setLayout(self.LPlot)
@@ -196,6 +201,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.HBox.addWidget(self.InvertButton)
         self.SaveButton = QtGui.QPushButton(self.groupBox)
         self.SaveButton.setObjectName("SaveButton")
+        self.SaveButton.clicked.connect(self.openSave)
         self.HBox.addWidget(self.SaveButton)
         self.CloseButton = QtGui.QPushButton(self.groupBox)
         self.CloseButton.setObjectName("CloseButton")
@@ -299,13 +305,21 @@ class pBaseForm(QtGui.QMainWindow):
         self.display()
         
     def openSave(self):
-        return 0
+    	suggestedname=os.path.join(os.curdir,"output.fit")
+        fname, _ = QtGui.QFileDialog.getSaveFileName(self,self.tr("Save data file"),suggestedname,self.tr("Fit Files (*.fit)"))
+        if fname:
+            self.statlabel.setText("Saving File %s" %fname)
+            self.workflow.SaveFileFits(fname)
+            
+        else: self.statlabel.setText("Failed to save File")
         
     def display(self):
         """
             Deal with displaying the picture
         """
         self.axes.clear()
+        self.axesPES.clear()
+        #Deal with image
         xmax,ymax=self.workflow.datas.shape
         self.XSlider.setMaximum(xmax)
         self.YSlider.setMaximum(ymax)
@@ -326,6 +340,11 @@ class pBaseForm(QtGui.QMainWindow):
         self.axes.yaxis.set_major_formatter(nullfmt)
         self.axes.xaxis.set_major_formatter(nullfmt)
         self.axes.tick_params(bottom='off',top='off',left='off',right='off')
+        #Deal with PES
+        self.axesPES.plot(self.workflow.normed_pes,'k')
+        self.axesPES.set_yticks([0,0.5,1.])
+        self.axesPES.set_xlim([0,self.workflow.r])
+        #Deal with display
         self.canvas.draw()
         del palette
         self.statcoordinates.setText("Center: x=%i , y=%i"%self.workflow.center)
@@ -416,7 +435,7 @@ class pBaseForm(QtGui.QMainWindow):
             self.display()
             
     def RunProcess(self):
-        self.process=CenterProcesser(self)#.workflow)
+        self.process=CenterProcesser(self)
         QtCore.QObject.connect(self.process,QtCore.SIGNAL("progress(int)"),self.progressBar,QtCore.SLOT("setValue(int)"))
         if not self.process.isRunning():
             self.process.exiting = False
@@ -427,11 +446,17 @@ class pBaseForm(QtGui.QMainWindow):
         self.display()
     
     def InvertFn(self):
-    	base=self.workflow.LoadBasis()
-    	if base==-1: QtGui.QMessageBox.warning(self,"No Basis","Basis file don't exist yet !!! \n Please build it first. :(")
-    	else: 
-    		s,u,v=base
-    		self.workflow.Invert(u)
+    	self.progressBar.reset()
+        self.progressBar.setVisible(True)
+    	self.process=InvertProcesser(self)
+        QtCore.QObject.connect(self.process,QtCore.SIGNAL("progress(int)"),self.progressBar,QtCore.SLOT("setValue(int)"))
+        if not self.process.isRunning():
+            self.process.exiting = False
+            self.process.start() 
+        while not self.process.isFinished(): QtCore.QCoreApplication.processEvents()
+        self.progressBar.setVisible(False)
+    	
+    	self.workflow.datas=self.workflow.output
     	self.display()
     
     def changeXValue(self,value):
@@ -492,4 +517,33 @@ class CenterProcesser(QtCore.QThread):
             else: 
                 self.emit(QtCore.SIGNAL("progress(int)"),20)
                 break
+                
+class InvertProcesser(QtCore.QThread):
+    __errorHappened=False
+    def __init__(self,gui,parent=None):
+        QtCore.QThread.__init__(self,parent)
+        self.workflow=gui.workflow
+        self.gui=gui
+        self.exiting=False
+        
+    def run(self):
+    	base=self.workflow.LoadBasis()
+    	if len(base.shape)<2: 
+    		QtGui.QMessageBox.warning(self,"No Basis","Basis file don't exist yet !!! \n Please build it first. :(")
+    		return 0
+    	self.gui.statlabel.setText("Basis Loaded")
+    	self.emit(QtCore.SIGNAL("progress(int)"),5)
+    	
+        polar=self.workflow.to_polar(self.workflow.raw)
+        self.gui.statlabel.setText("Polar Image")
+    	self.emit(QtCore.SIGNAL("progress(int)"),10)
+    	
+        self.workflow.Invert(polar,base)
+        self.gui.statlabel.setText("Fitted")
+    	self.emit(QtCore.SIGNAL("progress(int)"),15)
+    	
+        self.workflow.image_for_display()
+        self.gui.statlabel.setText("Image inverted")
+    	self.emit(QtCore.SIGNAL("progress(int)"),20)
 
+        	
