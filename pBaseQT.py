@@ -34,7 +34,8 @@ class pBaseForm(QtGui.QMainWindow):
         #Define datas
         self.plotsettings=PlotSettings()
         self.workflow=Datas()
-        
+        self.file_path=''
+        self.file_name=''
         #Create Main Window
         MainWindow.setObjectName("MainWindow")
         
@@ -298,14 +299,18 @@ class pBaseForm(QtGui.QMainWindow):
     def openFile(self):
         fname, _ = QtGui.QFileDialog.getOpenFileName(self,self.tr("Open data file"),"~/",self.tr("Fit Files (*.fit);;Image Files (*.tiff *.jpg *.bmp);;Txt (*.txt *.dat)"))
         if fname:
-            self.statlabel.setText("Opening File %s" %fname)
-            self.workflow.OpenFile(fname)
-            self.statlabel.setText("Go !")
+        	file=QtCore.QFileInfo(fname)
+        	self.file_path=file.path()
+        	self.file_name=file.fileName()
+        	self.statlabel.setText("Opening File %s" %fname)
+        	self.workflow.OpenFile(fname)
+        	self.statlabel.setText("Go !")
         else: self.statlabel.setText("Failed to open File")
         self.display()
         
     def openSave(self):
-    	suggestedname=os.path.join(os.curdir,"output.fit")
+    	outputname=self.file_path[:-4]+'_output.fit'
+    	suggestedname=os.path.join(self.file_path,outputname)
         fname, _ = QtGui.QFileDialog.getSaveFileName(self,self.tr("Save data file"),suggestedname,self.tr("Fit Files (*.fit)"))
         if fname:
             self.statlabel.setText("Saving File %s" %fname)
@@ -332,7 +337,7 @@ class pBaseForm(QtGui.QMainWindow):
         if self.workflow.r!=0.:
             xc,yc= paint_circle(self.workflow.center,self.workflow.r)
             scalarMap = cm.ScalarMappable(norm=colors.Normalize(vmin=0, vmax=256), cmap=palette)
-            self.axes.plot(xc,yc,color=scalarMap.to_rgba(256),lw=2)
+            self.axes.plot(xc,yc,color=scalarMap.to_rgba(256),lw=1)
         
         self.axes.axis([0,ymax,0,xmax])
         # no label
@@ -446,9 +451,11 @@ class pBaseForm(QtGui.QMainWindow):
         self.display()
     
     def InvertFn(self):
+    	#Path to the basis file
+    	dpath = QtGui.QFileDialog.getExistingDirectory(self,self.tr("Basis Files Directory"),dir="~/")
     	self.progressBar.reset()
         self.progressBar.setVisible(True)
-    	self.process=InvertProcesser(self)
+    	self.process=InvertProcesser(self,dpath)
         QtCore.QObject.connect(self.process,QtCore.SIGNAL("progress(int)"),self.progressBar,QtCore.SLOT("setValue(int)"))
         if not self.process.isRunning():
             self.process.exiting = False
@@ -520,14 +527,16 @@ class CenterProcesser(QtCore.QThread):
                 
 class InvertProcesser(QtCore.QThread):
     __errorHappened=False
-    def __init__(self,gui,parent=None):
+    def __init__(self,gui,path,parent=None):
         QtCore.QThread.__init__(self,parent)
         self.workflow=gui.workflow
         self.gui=gui
         self.exiting=False
+        self.path=path
         
     def run(self):
-    	base=self.workflow.LoadBasis()
+    	self.gui.statlabel.setText("Start the inversion procedure")
+    	base=self.workflow.LoadBasis(self.path)
     	if len(base.shape)<2: 
     		QtGui.QMessageBox.warning(self,"No Basis","Basis file don't exist yet !!! \n Please build it first. :(")
     		return 0
@@ -541,6 +550,7 @@ class InvertProcesser(QtCore.QThread):
         self.workflow.Invert(polar,base)
         self.gui.statlabel.setText("Fitted")
     	self.emit(QtCore.SIGNAL("progress(int)"),15)
+    	del polar,base
     	
         self.workflow.image_for_display()
         self.gui.statlabel.setText("Image inverted")
