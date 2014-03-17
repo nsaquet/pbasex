@@ -99,12 +99,34 @@ class pBaseForm(QtGui.QMainWindow):
         self.PolyBox.valueChanged.connect(self.ChangeLmax)
         self.PolyLayout.addWidget(self.PolyBox)
         self.PolyLayout.insertSpacing(2,15)
+
         self.OddBox = QtGui.QCheckBox(self.PolyGBox)
         self.OddBox.setObjectName("OddBox")
         self.OddBox.stateChanged.connect(self.ChangeOdd)
         self.PolyLayout.addWidget(self.OddBox)
         self.PolyGBox.setLayout(self.PolyLayout)
         self.verticalLayout.addWidget(self.PolyGBox)
+        
+                
+        self.DataChoiceGBox = QtGui.QGroupBox()
+        self.DataChoiceGBox.setFlat(True)
+        self.DataChoiceGBox.setObjectName("DataChoiceBox")
+        self.DCLayout = QtGui.QHBoxLayout(self.DataChoiceGBox)
+        self.DCLayout.setContentsMargins(5, 5, 5, 5)
+        self.DCLayout.setObjectName("DataChoiceLayout")
+        self.label2 = QtGui.QLabel(self.DataChoiceGBox)
+        self.label2.setObjectName("label2")
+        self.DCLayout.addWidget(self.label2)
+        self.DataChoiceBox = QtGui.QComboBox(self.DataChoiceGBox)
+        self.DataChoiceBox.setObjectName("DataChoiceBox")
+        self.DataChoiceBox.addItem("")
+        self.DataChoiceBox.addItem("")
+        self.DCLayout.addWidget(self.DataChoiceBox)
+        self.DCLayout.insertSpacing(2,15) 
+        self.DataChoiceGBox.setLayout(self.DCLayout)
+        self.verticalLayout.addWidget(self.DataChoiceGBox)   
+        
+        
         #Define the Centering Tool Box
         self.CenterBox = QtGui.QGroupBox(self.groupBox)
         self.CenterBox.setFlat(True)
@@ -183,9 +205,10 @@ class pBaseForm(QtGui.QMainWindow):
         self.ColorLayout.setStretch(2, 1)
         self.ColorBox.setLayout(self.ColorLayout)
         self.verticalLayout.addWidget(self.ColorBox)
-        #self.verticalLayout.setStretch(0, 1)
-        #self.verticalLayout.setStretch(1, 2)
-        #self.verticalLayout.setStretch(2, 1)
+        self.verticalLayout.setStretch(0, 1)
+        self.verticalLayout.setStretch(1, 1)
+        self.verticalLayout.setStretch(2, 1.5)
+        self.verticalLayout.setStretch(3, 1)
         
         #Define the Main Tool Box: Invert|Save|Close buttons
         self.HBox = QtGui.QHBoxLayout()
@@ -268,8 +291,12 @@ class pBaseForm(QtGui.QMainWindow):
         MainWindow.setWindowTitle(QtGui.QApplication.translate("MainWindow", "pBaseQt", None, QtGui.QApplication.UnicodeUTF8))
         self.groupBox.setTitle(QtGui.QApplication.translate("MainWindow", "Treatments", None, QtGui.QApplication.UnicodeUTF8))
         self.PolyGBox.setTitle(QtGui.QApplication.translate("MainWindow", "Polynoms", None, QtGui.QApplication.UnicodeUTF8))
+        self.DataChoiceGBox.setTitle(QtGui.QApplication.translate("MainWindow", "Choice of Data for the inversion", None, QtGui.QApplication.UnicodeUTF8))
         self.label.setText(QtGui.QApplication.translate("MainWindow", "Max Legendre Polynoms:", None, QtGui.QApplication.UnicodeUTF8))
+        self.label2.setText(QtGui.QApplication.translate("MainWindow", "Datas to be inverted:", None, QtGui.QApplication.UnicodeUTF8))
         self.OddBox.setText(QtGui.QApplication.translate("MainWindow", "Odd", None, QtGui.QApplication.UnicodeUTF8))
+        self.DataChoiceBox.setItemText(0, QtGui.QApplication.translate("MainWindow", "Original", None, QtGui.QApplication.UnicodeUTF8))
+        self.DataChoiceBox.setItemText(1, QtGui.QApplication.translate("MainWindow", "Current", None, QtGui.QApplication.UnicodeUTF8))
         self.CenterBox.setTitle(QtGui.QApplication.translate("MainWindow", "Centering", None, QtGui.QApplication.UnicodeUTF8))
         self.TransposeButton.setText(QtGui.QApplication.translate("MainWindow", "Transpose", None, QtGui.QApplication.UnicodeUTF8))
         self.FixCenterBox.setText(QtGui.QApplication.translate("MainWindow", "Fixed Center", None, QtGui.QApplication.UnicodeUTF8))
@@ -543,7 +570,13 @@ class InvertProcesser(QtCore.QThread):
     	self.gui.statlabel.setText("Basis Loaded")
     	self.emit(QtCore.SIGNAL("progress(int)"),5)
     	
-        polar=self.workflow.to_polar(self.workflow.raw)
+    	if self.gui.DataChoiceBox.currentText()=="Original":
+    		self.gui.statlabel.setText("Original") 
+    		polar=self.workflow.to_polar(self.workflow.raw)
+    	else:
+    		self.gui.statlabel.setText("Current")
+    		polar=self.workflow.to_polar(self.workflow.datas)
+    		
         self.gui.statlabel.setText("Polar Image")
     	self.emit(QtCore.SIGNAL("progress(int)"),10)
     	
