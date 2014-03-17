@@ -273,15 +273,13 @@ class Datas():
         #List of legendre polynoms
         listLegendre=np.arange(0,self.lmax+1,(not self.odd)+1)
         kvec,list=np.meshgrid(np.arange(Funcnumber),listLegendre)
-        kvector=kvec.T.ravel()
-        ListL=list.T.ravel()
-        K,Rad=np.meshgrid(kvector,new_r)
-        K,Theta=np.meshgrid(kvector,new_t)
-        del listLegendre,list,kvec,kvector
+        K,Rad=np.meshgrid(kvec.T.ravel(),new_r)
+        K,Theta=np.meshgrid(kvec.T.ravel(),new_t)
+        del listLegendre,kvec
             	
     	Rad*=Rbin/float(self.r)
     	func=np.exp(-(Rad-K*Bspace)**2/(2*Bwidth**2))
-    	leg=eval_legendre(ListL,np.cos(Theta))*self.coefficients
+    	leg=eval_legendre(list.T.ravel(),np.cos(Theta))*self.coefficients
     	    	
     	outdata=(func*leg).sum(axis=1)*new_r
     	outdata[outdata<0]=0
@@ -437,72 +435,3 @@ def theta_f(x,y):
 	np.ravel(ang)[np.intersect1d(indx,indy)]*=-1
 	np.ravel(ang)[np.intersect1d(indx,indy)]+=np.pi
 	return ang
-    
-"""
-	Need to build display of the inversion result
-	Need Save
-	Need status bar
-	Need stability
-"""
-
-
-
-
-#Old function slow but working
-"""
-def cart2pol_old(data,scale,center,r):
-		#Cubic interpolation
-		#Fastest implementation of the cubic interpolation so far
-		#Faster than max(0,(x+1)**3) by 20% or any of the factorization by bool (x+2>0) by 60-65%
-	def cubic(x):
-		p0=lambda y: (y+2)**3 if (y+2>0) else 0
-		p1=lambda y: (y+1)**3 if (y+1>0) else 0
-		p2=lambda y: (y)**3 if (y>0) else 0
-		p3=lambda y: (y-1)**3 if (y-1>0) else 0
-		return (p0(x)-4*p1(x)+6*p2(x)-4*p3(x))/6.
-	
-	
-	#Adapt the  selected area size to polar basis size
-	
-	nR=min(r,scale.nR)
-	if nR>Rbin: nR=Rbin #Security
-	
-	Rfact=nR/float(Rbin)
-	scale.Rfact=Rfact
-	print Rfact
-	polar=np.array([])
-	rfunc=[]
-	
-	#Calculate the polar map
-	for l in np.arange(Rbin):
-		nth=2*l+1	#define a r dependant angular binning 
-		rad=l*Rfact	#Radius in image unit
-		
-		theta=np.pi*np.arange(nth)/nth
-		x=rad*np.cos(theta) + center[1]
-		y=-rad*np.sin(theta) + center[0]
-		
-		#Cubic interpolation
-		xpix=x/scale.Xfact
-		ypix=y/scale.Yfact
-		ix=xpix.astype('int')
-		iy=ypix.astype('int')
-		dx=xpix-ix
-		dy=ypix-iy
-		
-		Pol=np.zeros_like(theta)
-		
-		for index in np.arange(nth):
-			for i in np.arange(-1,3):
-				for j in np.arange(-1,3):
-					condx=np.logical_and((ix[index]+i)<scale.nX,(ix[index]+i)>=0)
-					condy=np.logical_and((iy[index]+j)<scale.nY,(iy[index]+j)>=0)
-					if np.logical_and(condx,condy):
-						cub=cubic(i-dx[index])*cubic(dy[index]-j)
-						#print i-dx[index],cubic(i-dx[index]) ,cub
-						Pol[index]+=data.ravel()[(ix[index]+i)*scale.nY+(iy[index]+j)]*cub	
-					
-		polar=np.concatenate((polar,Pol))
-		rfunc.append(Pol.sum()/Pol.shape[0])
-	return polar,rfunc
-"""
