@@ -384,7 +384,7 @@ class pBaseForm(QtGui.QMainWindow):
         #Deal with display
         self.canvas.draw()
         del palette
-        self.statcoordinates.setText("Center: x=%i , y=%i"%self.workflow.center)
+        self.statcoordinates.setText(u"Center: x={0[0]} , y={0[1]}.\t Radius: {1}".format(self.workflow.center,int(self.workflow.r)))
         
     def OnChooseCM(self,text):
         """
