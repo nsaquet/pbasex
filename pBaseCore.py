@@ -1,9 +1,8 @@
 import numpy as np
 import scipy as sp
 import pyfits
-from os.path import isfile
+from os.path import isfile,join
 from scipy.ndimage.measurements import center_of_mass as com
-from numpy.polynomial.legendre import legval
 from scipy.special import eval_legendre
 
 """
@@ -65,7 +64,7 @@ class Datas():
         Y-=250 #Center the ring
         theta=theta_f(X,Y)
         r=np.sqrt(X**2+Y**2)
-        self.datas=np.exp(-(r-80)**2/50)*legval(np.cos(theta),[0,0,1])
+        self.datas=np.exp(-(r-80)**2/50)*eval_legendre(2,np.cos(theta))
         self.datas/=self.datas.max()
         #self.datas[self.datas<0.]=0.
         self.raw=self.datas
@@ -79,7 +78,8 @@ class Datas():
         self.normed_pes=np.zeros(Rbin)
         self.ang=np.zeros((Angbin,self.get_NumberPoly()))
         self.output=np.zeros_like(self.datas)
-        
+        self.pes_error=np.zeros(Rbin)
+        self.ang_var=np.zeros((Angbin,self.get_NumberPoly()))
     
     def get_NumberPoly(self):
     	if not self.odd: return np.arange(0,self.lmax+1,2).shape[0]
@@ -117,15 +117,16 @@ class Datas():
         else: print "Incorrect data file format"
         
     def SaveFileFits(self,filepath):
-    	hdu_pes=pyfits.ImageHDU(np.array([np.arange(self.normed_pes.shape[0]),self.normed_pes]))
+    	hdu_pes=pyfits.ImageHDU(np.array([np.arange(self.normed_pes.shape[0]),self.normed_pes,self.pes_error]))
     	hdu_ang=pyfits.ImageHDU(self.ang)
+    	hdu_ang_var=pyfits.ImageHDU(self.ang_var)
     	hdu_out=pyfits.PrimaryHDU(self.output)
     	col1=pyfits.Column(name='Max Legendre',format='I',array=np.array([self.lmax]))
     	col2=pyfits.Column(name='Image Center',format='2I',array=np.array(self.center))
     	col3=pyfits.Column(name='Selection radius',format='I',array=np.array([self.r]))
         col4=pyfits.Column(name='odd',format='I',array=np.array([self.odd]))
         tbhdu=pyfits.new_table([col1,col4,col2,col3])#, tbtype='TableHDU')
-        hdulist=pyfits.HDUList([hdu_out,hdu_pes,hdu_ang,tbhdu])
+        hdulist=pyfits.HDUList([hdu_out,hdu_pes,hdu_ang,hdu_ang_var,tbhdu])
         hdulist.writeto(filepath,clobber=True)
         
     def get_com(self):
@@ -196,16 +197,16 @@ class Datas():
         
         return sum(self.datas[xind,yind]*self.datas[r_xind,r_yind])
     
-    def LoadBasis(self):
+    def LoadBasis(self,path):
     	"""
     		Look for Basis file and load it. We need only the initial basis for leastsq
     	"""
     	#Build basis file name
-    	path='./BasisFiles/'
     	if not self.odd: filenamescore=''.join(['P%i' %i for i in np.arange(0,self.lmax+1,2)])
     	else:filenamescore=''.join(['P%i' %i for i in np.arange(0,self.lmax+1)])
     	fileextension='.dat'
-    	Ufilename=path+'U'+filenamescore+fileextension
+    	fname='U'+filenamescore+fileextension
+    	Ufilename=join(path,fname)
     	#Generate Basis file if not existing
     	if not (isfile(Ufilename)): 
     	    print 'files missing'
@@ -219,12 +220,14 @@ class Datas():
     	return u
     
     def to_polar(self,data):
-    	return cart2pol(data,self.scale,self.center,self.r)
+    	return (cart2pol(data,self.scale,self.center,self.r),cart2pol_var(data,self.scale,self.center,self.r))
     	
     def Invert(self,polar,u):
         #Resolve Basis*coeff=polar_dat
-        self.coefficients,residuts,siz,singulars=np.linalg.lstsq(u,polar)       #Need to build up angular distribution and PES
-                        
+        self.coefficients,residuts,siz,singulars=np.linalg.lstsq(u,polar[0])       #Need to build up angular distribution and PES
+        self.coefficients_var,residuts,siz,singulars=np.linalg.lstsq(u*u,polar[1])
+        del residuts,siz,singulars,polar,u
+                         
         width=2*Bwidth**2
         rad=np.arange(Rbin)
         kvector=np.arange(Funcnumber)
@@ -232,23 +235,33 @@ class Datas():
         #Angular Matrix is of size NLxNR where NL is the number of Legendre polynoms and Nr the radial binning
         NL=self.get_NumberPoly()
         angular=np.zeros((NL,Angbin),dtype='float')
+        angular_var=np.zeros((NL,Angbin),dtype='float')
         coefs=self.coefficients.reshape((Funcnumber,NL))
+        coefs_var=self.coefficients_var.reshape((Funcnumber,NL))
 
         for r in rad:
             fradial=np.exp(-(r*Rbin/float(self.r)-Bspace*kvector)**2/width)
             for l in np.arange(NL):
                 angular[l][r]=sum(fradial*coefs[:,l])
+                angular_var[l][r]=sum(fradial*fradial*coefs_var[:,l])
         
         ang0=angular[0,:]
-        ind=np.where(ang0<0)[0]
-        if len(ind)>0: 
-    		ang0[ind]=0.0
-    		angular[:,ind]=0.0
-    	ind=np.where(ang0>0)[0]
-    	angular[1:,ind]/=ang0[ind]
+        ang0_var=angular_var[0,:]
+        angular[:,ang0<=1e-8]=0.0
+        angular_var[:,ang0<=1e-8]=0.0
+        ang0[ang0<=1e-8]=0.0
+        
+        a0=ang0[ang0>1e-6]
+    	angular[1:,ang0>1e-6]/=a0
+        angular_var[1:,ang0>1e-6]/=(a0**2)
+        angular_var[1:,ang0>1e-6]+=(angular[1:,ang0>1e-6]**2)*ang0_var[ang0>1e-6]/(a0**4)
+        
         pmax=(ang0*rad**2).max()
         self.normed_pes=ang0*rad**2 /pmax
+        angular_var*=(rad**2 /pmax)**2
         self.ang=angular
+        self.ang_var=np.sqrt(np.abs(angular_var))
+    	self.pes_error=self.ang_var[0,:]
     
     def image_for_display(self):
     	dim=int(1.1*self.r)
@@ -256,7 +269,7 @@ class Datas():
     	X,Y=np.meshgrid(np.arange(-dim,dim+1),np.arange(-dim,dim+1))
     	new_r=np.sqrt(X**2+Y**2).ravel()
     	new_t=theta_f(X,Y).ravel()
-        
+        del X,Y
         #List of legendre polynoms
         listLegendre=np.arange(0,self.lmax+1,(not self.odd)+1)
         kvec,list=np.meshgrid(np.arange(Funcnumber),listLegendre)
@@ -264,6 +277,7 @@ class Datas():
         ListL=list.T.ravel()
         K,Rad=np.meshgrid(kvector,new_r)
         K,Theta=np.meshgrid(kvector,new_t)
+        del listLegendre,list,kvec,kvector
             	
     	Rad*=Rbin/float(self.r)
     	func=np.exp(-(Rad-K*Bspace)**2/(2*Bwidth**2))
@@ -331,6 +345,60 @@ def cart2pol(data,scale,center,r):
 	polar+=(dat*cub).sum(axis=1)
 	return polar
 
+def cart2pol_var(data,scale,center,r):
+
+	"""
+		Cubic interpolation
+		Fastest implementation of the cubic interpolation so far for an array
+	"""
+	def cubic(y):
+		p0=(y+2)**3
+    		p0[p0<0]=0
+    		p1 = (y+1)**3
+    		p1[p1<0]=0
+    		p2 = y**3
+    		p2[p2<0]=0
+    		p3 =(y-1)**3
+    		p3[p3<0]=0
+    		return (p0-4.*p1+6.*p2-4.*p3)/6.
+	
+	"""
+		Adapt the  selected area size to polar basis size
+	"""
+	nR=min(r,scale.nR)
+	if nR>Rbin: nR=Rbin #Security
+	
+	Rfact=nR/float(Rbin)
+	scale.Rfact=Rfact
+	
+	polar=np.array([])
+	
+	rad=Rfact*np.concatenate([r*np.ones(2*r+1) for r in np.arange(Rbin)])
+	theta=np.concatenate([np.pi*np.arange(t)/t for t in 2*np.arange(Rbin)+1])
+	x=rad*np.cos(theta) + center[1]
+	y=-rad*np.sin(theta) + center[0]
+	#Cubic interpolation
+	xpix=x/scale.Xfact
+	ypix=y/scale.Yfact
+	ix=xpix.astype('int')
+	iy=ypix.astype('int')
+	dx=xpix-ix
+	dy=ypix-iy
+	polar=np.zeros_like(rad)
+	
+	i,j=np.meshgrid(np.arange(-1,3),np.arange(-1,3))
+	i=i.ravel()
+	j=j.ravel()
+	I,IX=np.meshgrid(i,ix)
+	J,IY=np.meshgrid(i,iy)
+	IXI=IX+I
+	IYJ=IY+J
+	rule1=(IXI<scale.nX) & (IXI>=0)
+	rule2=(IYJ<scale.nY) & (IYJ>=0)
+	cub=cubic(I-dx.reshape((dx.shape[0],1)))*cubic(dy.reshape((dy.shape[0],1))-J)
+	dat=data.ravel()[(IXI*scale.nY+IYJ).ravel()].reshape(IYJ.shape)
+	polar+=(dat*cub*cub).sum(axis=1)
+	return polar
 
 def theta_f(x,y):
 	ang=np.arctan(np.fabs(x)/np.fabs(y))
