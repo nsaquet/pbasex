@@ -23,12 +23,6 @@ from pBaseCore import Datas,theta_f
 waitCondition = QtCore.QWaitCondition()
 mutex = QtCore.QMutex()
 
-class PlotSettings():
-    def __init__(self):
-        self.palette=cm.jet.name
-        self.IsSqrt=False
-        self.IsFixed=False
-
 class pBaseForm(QtGui.QMainWindow):
     def setupUi(self, MainWindow):
         #Define datas
@@ -194,7 +188,6 @@ class pBaseForm(QtGui.QMainWindow):
         self.ColorMapBox.addItem("")
         self.ColorMapBox.addItem("")
         self.ColorMapBox.addItem("")
-        self.ColorMapBox.addItem("")
         self.ColorMapBox.activated[str].connect(self.OnChooseCM)
         self.ColorLayout.addWidget(self.ColorMapBox)
         self.InvColorBox = QtGui.QCheckBox(self.ColorBox)
@@ -313,9 +306,8 @@ class pBaseForm(QtGui.QMainWindow):
         self.ColorMapBox.setItemText(1, QtGui.QApplication.translate("MainWindow", "Gnuplot", None, QtGui.QApplication.UnicodeUTF8))
         self.ColorMapBox.setItemText(2, QtGui.QApplication.translate("MainWindow", "Gray", None, QtGui.QApplication.UnicodeUTF8))
         self.ColorMapBox.setItemText(3, QtGui.QApplication.translate("MainWindow", "Hot", None, QtGui.QApplication.UnicodeUTF8))
-        self.ColorMapBox.setItemText(4, QtGui.QApplication.translate("MainWindow", "Rainbow", None, QtGui.QApplication.UnicodeUTF8))
-        self.ColorMapBox.setItemText(5, QtGui.QApplication.translate("MainWindow", "Winter", None, QtGui.QApplication.UnicodeUTF8))
-        self.ColorMapBox.setItemText(6, QtGui.QApplication.translate("MainWindow", "Terrain", None, QtGui.QApplication.UnicodeUTF8))
+        self.ColorMapBox.setItemText(4, QtGui.QApplication.translate("MainWindow", "Winter", None, QtGui.QApplication.UnicodeUTF8))
+        self.ColorMapBox.setItemText(5, QtGui.QApplication.translate("MainWindow", "Terrain", None, QtGui.QApplication.UnicodeUTF8))
         self.InvColorBox.setText(QtGui.QApplication.translate("MainWindow", "Inverse Colors", None, QtGui.QApplication.UnicodeUTF8))
         self.SqrtColorBox.setText(QtGui.QApplication.translate("MainWindow", "Sqrt", None, QtGui.QApplication.UnicodeUTF8))
         self.InvertButton.setText(QtGui.QApplication.translate("MainWindow", "Invert !", None, QtGui.QApplication.UnicodeUTF8))
@@ -362,8 +354,12 @@ class pBaseForm(QtGui.QMainWindow):
         self.YSlider.setMaximum(ymax)
         self.XSlider.setValue(self.workflow.center[0])
         self.YSlider.setValue(self.workflow.center[1])
-        palette=cm.get_cmap(self.plotsettings.palette)
-        if self.plotsettings.IsSqrt: palette=cmap_xmap(lambda x: x**2,palette)
+        
+        palette=self.plotsettings.cmapdic[self.plotsettings.palettename]
+        if self.plotsettings.IsSqrt and self.plotsettings.IsR: palette=self.plotsettings.cmapdic_r_sqrt[self.plotsettings.palettename]	
+        elif self.plotsettings.IsSqrt: palette=self.plotsettings.cmapdic_sqrt[self.plotsettings.palettename]
+        elif self.plotsettings.IsR: palette=self.plotsettings.cmapdic_r[self.plotsettings.palettename]
+        
         self.axes.imshow(self.workflow.datas,extent=[0,ymax,0,xmax],origin='lower',cmap=palette,vmax=0.8*self.workflow.datas.max())
         
         if self.workflow.r!=0.:
@@ -390,36 +386,23 @@ class pBaseForm(QtGui.QMainWindow):
         """
             Change cmap settings
         """
-        if text=="Jet": Newpalette=cm.jet.name
-        elif text=="Gnuplot": Newpalette=cm.gnuplot2.name
-        elif text=="Gray": Newpalette=cm.gray.name
-        elif text=="Hot": Newpalette=cm.hot.name
-        elif text=="Terrain": Newpalette=cm.terrain.name
-        elif text=="Rainbow": Newpalette=cm.rainbow.name
-        elif text=="Winter": Newpalette=cm.winter.name
-        else: Newpalette=cm.jet.name
-        if self.plotsettings.palette.endswith("_r"):Newpalette=Newpalette+'_r'
-        self.plotsettings.palette=Newpalette
+        self.plotsettings.palettename=text
         self.display()
         
     def InvertCM(self,state):
         """
             Inverse cmap scale 
         """
-        if state == QtCore.Qt.Checked: Newpalette=self.plotsettings.palette+'_r'
-        else: Newpalette=self.plotsettings.palette[:-2]
-        self.plotsettings.palette=Newpalette
+        if state == QtCore.Qt.Checked: self.plotsettings.IsR=True
+        else: self.plotsettings.IsR=False
         self.display()
         
     def SqrtCM(self,state):
         """
             Sqrt cmap scale 
         """
-        if state == QtCore.Qt.Checked: self.plotsettings.IsSqrt=True
-        else: 
-        	self.plotsettings.IsSqrt=False
-        	palette=cm.get_cmap(self.plotsettings.palette)
-        	palette=cmap_xmap(lambda x: np.sqrt(x),palette)
+        if (state == QtCore.Qt.Checked): self.plotsettings.IsSqrt=True
+        else: self.plotsettings.IsSqrt=False
         self.display() 
 
     def ChangeOdd(self,state):
@@ -523,13 +506,13 @@ def cmap_xmap(function,cmap):
     """ Applies function, on the indices of colormap cmap. Beware, function
     should map the [0, 1] segment to itself, or you are in for surprises.
     """
-    cdict = cmap._segmentdata
+    cdict = cmap._segmentdata.copy()
     function_to_map = lambda x : (function(x[0]), x[1], x[2])
     for key in ('red','green','blue'):         
         cdict[key] = map(function_to_map, cdict[key])
         cdict[key].sort()
         assert (cdict[key][0]<0 or cdict[key][-1]>1), "Resulting indices extend out of the [0, 1] segment."
-    return colors.LinearSegmentedColormap('colormap',cdict,1024)
+    return colors.LinearSegmentedColormap('name_sqrt',cdict,2048)
 
 def paint_circle(center,radius):
         theta=np.linspace(-np.pi,np.pi,1001)
@@ -594,4 +577,72 @@ class InvertProcesser(QtCore.QThread):
         self.gui.statlabel.setText("Image inverted")
     	self.emit(QtCore.SIGNAL("progress(int)"),20)
 
-        	
+class PlotSettings():
+    def __init__(self):
+        self.palettename='Jet'
+        self.IsSqrt=False
+        self.IsR=False
+        self.IsFixed=False
+        cdict_coolheat ={'red'  :  ((0., 0., 0.), (0.25,0.,0.), (0.5,1.,1.), (0.75,1.0,1.0),  (1., 1., 1.)),
+    					 'green':  ((0., 0., 0.), (0.25,0.,0.), (0.5,0.,0.), (0.75,1.0,1.0),  (1., 1., 1.)),
+    					 'blue' :  ((0., 0., 0.), (0.25,1.,1.), (0.5,0.,0.), (0.75,0.0,0.0),  (1., 1., 1.))
+    					}
+    	cdict_coolheat_r ={'red'  :  ((0., 1., 1.), (0.25,1.,1.), (0.5,1,1.), (0.75,0,0),  (1., 0., 0.)),
+    					   'green':  ((0., 1., 1.), (0.25,1.,1.), (0.5,0.,0.), (0.75,0,0),  (1., 0., 0.)),
+    					   'blue' :  ((0., 1., 1.), (0.25,0.,0.), (0.5,0.,0.), (0.75,1,1),  (1., 0., 0.))
+    					  }
+    	coolheat = colors.LinearSegmentedColormap('mycoolheat', cdict_coolheat,2048)
+    	coolheat_r = colors.LinearSegmentedColormap('mycoolheat_r', cdict_coolheat_r,2048)
+    	
+    	cdict_gray ={'red'  :  ((0., 0., 0.),(0.25, 0.5, 0.4), (1., 1., 1.)),
+    				 'green':  ((0., 0., 0.),(0.25, 0.5, 0.4), (1., 1., 1.)),
+    				 'blue' :  ((0., 0., 0.),(0.25, 0.5, 0.4), (1., 1., 1.))
+    					}
+    	cdict_gray_r ={'red'  :  ((0., 1., 1.),(0.25, 0.5, 0.6), (1., 0., 0.)),
+    				   'green':  ((0., 1., 1.),(0.25, 0.5, 0.6), (1., 0., 0.)),
+    				   'blue' :  ((0., 1., 1.),(0.25, 0.5, 0.6), (1., 0., 0.))
+    				  }
+    	gray = colors.LinearSegmentedColormap('mygray', cdict_gray,2048)
+    	gray_r = colors.LinearSegmentedColormap('mygray_r', cdict_gray_r,2048)
+    	
+    	cdict_terrain ={'red': ((0.0, 0.2, 0.2),(0.15, 0.0, 0.0),(0.25, 0.0, 0.0),(0.5, 1.0, 1.0),(0.75, 0.5, 0.5),(1.0, 1.0, 1.0)),
+ 						'blue': ((0.0, 0.6, 0.6),(0.15, 1.0, 1.0),(0.25, 0.4, 0.4),(0.5, 0.6, 0.6),(0.75, 0.33, 0.33),(1.0, 1.0, 1.0)),
+ 						'green': ((0.0, 0.2, 0.2),(0.15, 0.6, 0.6),(0.25, 0.8, 0.8),(0.5, 1.0, 1.0),(0.75, 0.36, 0.36),(1.0, 1.0, 1.0))
+    					}
+    	cdict_terrain_r ={'red': ((0.0, 1., 1.),(0.25, 0.5, 0.5),(0.5, 1.0, 1.0),(0.75, 0.0, 0.0),(0.85, 0.0, 0.0),(1.0, 0.2, 0.2)),
+ 						  'blue': ((0.0, 1., 1.),(0.25, 0.33, 0.33),(0.5, 0.6, 0.6),(0.75, 0.4, 0.4),(0.85, 1.0, 1.0),(1.0, 0.6, 0.6)),
+ 						  'green': ((0.0, 1., 1.),(0.25, 0.36, 0.36),(0.5, 1.0, 1.0),(0.75, 0.8, 0.8),(0.85, 0.6, 0.6),(1.0, 0.2, 0.2))
+    					 }
+    	terrain = colors.LinearSegmentedColormap('myterrain', cdict_terrain,2048)
+    	terrain_r = colors.LinearSegmentedColormap('myterrain_r', cdict_terrain_r,2048)
+    	
+    	cdict_hot =cm.hot._segmentdata.copy()
+    	cdict_hot_r =cm.hot_r._segmentdata.copy()
+    	hot = colors.LinearSegmentedColormap('myhot', cdict_hot,2048)
+    	hot_r = colors.LinearSegmentedColormap('myhot_r', cdict_hot_r,2048)
+    	
+    	cdict_winter ={'blue': ((0.0, 1.0, 1.0),(0.125, 0.4, 0.4), (1.0, 0.25, 0.25)),
+ 					   'green': ((0.0, 0.2, 0.2),(0.125, 0.6, 0.4), (1.0, 1.0, 1.0)),
+ 					   'red': ((0.0, 0.0, 0.0),(0.25, 0., 0.), (1.0, 0.0, 0.0))
+ 					   }
+ 	cdict_winter_r ={'blue': ((0.0, 0.25, 0.25),(0.125, 0.6, 0.4), (1.0, 1., 1.)),
+ 					     'green': ((0.0, 1., 1.),(0.125, 0.4, 0.4), (1.0, 0.2, 0.2)),
+ 					     'red': ((0.0, 0.0, 0.0),(0.25, 0., 0.), (1.0, 0.0, 0.0))
+ 					   }
+    	winter = colors.LinearSegmentedColormap('mywinter', cdict_winter,2048)
+    	winter_r = colors.LinearSegmentedColormap('mywinter_r', cdict_winter_r,2048)
+    	
+    	cdict_jet ={'blue': ((0.0, 0.5, 0.75),(0.11, 1, 1),(0.34, 1, 1),(0.65, 0, 0),(1, 0, 0.5)),
+ 					'green': ((0.0, 0, 0.5),(0.125, 0, 0.5),(0.375, 1, 1),(0.64, 1, 1),(0.91, 0, 0.5),(1, 0, 0.5)),
+ 					'red': ((0.0, 0, 0.5), (0.35, 0, 0.5), (0.66, 1, 1), (0.89, 1, 1), (1, 0.5, 0.75))
+ 					}
+ 	cdict_jet_r ={'blue': ((0.0, 0., 0.5),(0.35, 0, 0),(0.76, 1, 1),(0.89, 1, 1),(1, 0.5, 0.75)),
+ 					'green': ((0.0, 0, 0.5),(0.125, 0, 0.5),(0.36, 1, 1),(0.64, 1, 1),(0.91, 0, 0.5),(1, 0, 0.5)),
+ 					'red': ((0.0, 0.5, 0.75), (0.11, 1, 1), (0.44, 1, 1), (0.65, 0, 0.5), (1, 0., 0.5))
+ 					}
+ 	jet = colors.LinearSegmentedColormap('myjet', cdict_jet,2048)
+    	jet_r = colors.LinearSegmentedColormap('myjet_r', cdict_jet_r,2048)
+    	self.cmapdic={'Jet':jet,'Hot':hot,'Gray':gray,'Gnuplot':coolheat,'Terrain':terrain,'Winter':winter}
+    	self.cmapdic_sqrt={'Jet':cmap_xmap(lambda x: x**2,jet),'Hot':cmap_xmap(lambda x: x**2,hot),'Gray':cmap_xmap(lambda x: x**2,gray),'Gnuplot':cmap_xmap(lambda x: x**2,coolheat),'Terrain':cmap_xmap(lambda x: x**2,terrain),'Winter':cmap_xmap(lambda x: x**2,winter)}
+    	self.cmapdic_r={'Jet':jet_r,'Hot':hot_r,'Gray':gray_r,'Gnuplot':coolheat_r,'Terrain':terrain_r,'Winter':winter_r}
+    	self.cmapdic_r_sqrt={'Jet':cmap_xmap(lambda x: x**2,jet_r),'Hot':cmap_xmap(lambda x: x**2,hot_r),'Gray':cmap_xmap(lambda x: x**2,gray_r),'Gnuplot':cmap_xmap(lambda x: x**2,coolheat_r),'Terrain':cmap_xmap(lambda x: x**2,terrain_r),'Winter':cmap_xmap(lambda x: x**2,winter_r)}        	
