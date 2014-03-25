@@ -64,7 +64,7 @@ class Datas():
         Y-=250 #Center the ring
         theta=theta_f(X,Y)
         r=np.sqrt(X**2+Y**2)
-        self.datas=np.exp(-(r-80)**2/50)*eval_legendre(0,np.cos(theta))
+        self.datas=np.exp(-(r-80)**2/50)*eval_legendre(2,np.cos(theta))
         self.datas/=self.datas.max()
         #self.datas[self.datas<0.]=0.
         self.raw=self.datas
@@ -128,6 +128,13 @@ class Datas():
         tbhdu=pyfits.new_table([col1,col4,col2,col3])#, tbtype='TableHDU')
         hdulist=pyfits.HDUList([hdu_out,hdu_pes,hdu_ang,hdu_ang_var,tbhdu])
         hdulist.writeto(filepath,clobber=True)
+    
+    def SaveFileDat(self,filepath):
+    	root=filepath[:-4]
+    	self.output.tofile(root+'_img_inv.dat')
+    	self.ang.tofile(root+'_ang.dat')
+    	self.ang_var.tofile(root+'_angvar.dat')
+        np.hstack((np.arange(Rbin),self.normed_pes,self.pes_error)).reshape((3,Rbin)).tofile(root+'_pes.dat')
         
     def get_com(self):
         datmax=self.datas.max()

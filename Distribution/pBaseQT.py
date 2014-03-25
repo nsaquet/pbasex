@@ -12,6 +12,7 @@ import matplotlib
 matplotlib.use('Qt4Agg')
 import numpy as np
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigCanvas
+#from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg
 from matplotlib.figure import Figure
 import matplotlib.gridspec as gridspec
 import matplotlib.cm as cm
@@ -45,11 +46,13 @@ class pBaseForm(QtGui.QMainWindow):
         self.canvas = FigCanvas(self.fig)
         self.canvas.setParent(self.Wplot)
         gs=gridspec.GridSpec(2,1,height_ratios=[4,1])
-        gs.update(hspace=0.05)
+        gs.update(hspace=0.2)
         self.axes=self.fig.add_subplot(gs[0])
         self.axesPES=self.fig.add_subplot(gs[1])
         gs.tight_layout(self.fig,pad=0.1)
         self.Wplot.setObjectName("Image")
+        #mpl_toolbar = NavigationToolbar(self.canvas, self.Wplot)
+        #self.LPlot.addWidget(mpl_toolbar)
         self.LPlot.addWidget(self.canvas)
         self.Wplot.setLayout(self.LPlot)
         # Bind the 'pick' event for clicking on one of the bars
@@ -145,7 +148,6 @@ class pBaseForm(QtGui.QMainWindow):
         self.YSlider.setObjectName("YSlider")
         self.gridLayout.addWidget(self.YSlider, 1, 1, 1, 1)
         self.TransposeButton = QtGui.QPushButton(self.CenterBox)
-        #self.TransposeButton.setStyleSheet("QPushButton {background: rgb(127,179,255);border-style:outset;border-width=2px;border-radius}")
         self.TransposeButton.setObjectName("TransposeButton")
         self.TransposeButton.clicked.connect(self.TransposeFn)
         self.gridLayout.addWidget(self.TransposeButton, 2, 0, 1, 1)
@@ -333,14 +335,44 @@ class pBaseForm(QtGui.QMainWindow):
         self.display()
         
     def openSave(self):
-    	outputname=self.file_path[:-4]+'_output.fit'
-    	suggestedname=os.path.join(self.file_path,outputname)
-        fname, _ = QtGui.QFileDialog.getSaveFileName(self,self.tr("Save data file"),suggestedname,self.tr("Fit Files (*.fit)"))
-        if fname:
-            self.statlabel.setText("Saving File %s" %fname)
-            self.workflow.SaveFileFits(fname)
-            
-        else: self.statlabel.setText("Failed to save File")
+    	
+    	msgbox=QtGui.QMessageBox(self)
+    	msgbox.setText("Which file format do you wish to use?")
+    	fitsbutton=msgbox.addButton("FITS",QtGui.QMessageBox.ActionRole)
+    	datbutton=msgbox.addButton("Dat",QtGui.QMessageBox.ActionRole)
+    	pdfbutton=msgbox.addButton("PDF",QtGui.QMessageBox.ActionRole)
+    	msgbox.setDefaultButton(fitsbutton)
+    	msgbox.exec_()
+    	if msgbox.clickedButton()==fitsbutton:
+    		outputname=self.file_path[:-4]+'_output.fit'
+    		suggestedname=os.path.join(self.file_path,outputname)
+        	fname, _ = QtGui.QFileDialog.getSaveFileName(self,self.tr("Save data file"),suggestedname,self.tr("Fits Files (*.fit)"))
+        	if fname:
+        		self.statlabel.setText("Saving File %s" %fname)
+        		self.workflow.SaveFileFits(fname)
+        	else: self.statlabel.setText("Failed to save File")
+    	elif msgbox.clickedButton()==datbutton:
+    		outputname=self.file_path[:-4]+'_output.dat'
+    		suggestedname=os.path.join(self.file_path,outputname)
+        	fname, _ = QtGui.QFileDialog.getSaveFileName(self,self.tr("Save data file"),suggestedname,self.tr("Dat Files (*.dat)"))
+        	if fname:
+        		self.statlabel.setText("Saving File %s" %fname)
+        		self.workflow.SaveFileDat(fname)
+        	else: self.statlabel.setText("Failed to save File")
+    	elif msgbox.clickedButton()==pdfbutton:
+    		outputname=self.file_path[:-4]+'_output.dat'
+    		suggestedname=os.path.join(self.file_path,outputname)
+        	fname, _ = QtGui.QFileDialog.getSaveFileName(self,self.tr("Save data file"),suggestedname,self.tr("PDF Files (*.pdf)"))
+        	if fname:
+        		fname_pes=fname[:-4]+'_PES.pdf'
+        		fname_img=fname[:-4]+'_ImgInv.pdf'
+        		self.statlabel.setText("Saving File %s" %fname_img)
+        		extent = self.axesPES.get_window_extent().transformed(self.fig.dpi_scale_trans.inverted())
+        		self.fig.savefig(fname_pes, bbox_inches=extent.expanded(1.2, 1.7))
+        		extent = self.axes.get_window_extent().transformed(self.fig.dpi_scale_trans.inverted())
+        		self.fig.savefig(fname_img, bbox_inches=extent.expanded(1.1, 1.1))
+        		
+        	else: self.statlabel.setText("Failed to save File")
         
     def display(self):
         """
@@ -645,4 +677,4 @@ class PlotSettings():
     	self.cmapdic={'Jet':jet,'Hot':hot,'Gray':gray,'Gnuplot':coolheat,'Terrain':terrain,'Winter':winter}
     	self.cmapdic_sqrt={'Jet':cmap_xmap(lambda x: x**2,jet),'Hot':cmap_xmap(lambda x: x**2,hot),'Gray':cmap_xmap(lambda x: x**2,gray),'Gnuplot':cmap_xmap(lambda x: x**2,coolheat),'Terrain':cmap_xmap(lambda x: x**2,terrain),'Winter':cmap_xmap(lambda x: x**2,winter)}
     	self.cmapdic_r={'Jet':jet_r,'Hot':hot_r,'Gray':gray_r,'Gnuplot':coolheat_r,'Terrain':terrain_r,'Winter':winter_r}
-    	self.cmapdic_r_sqrt={'Jet':cmap_xmap(lambda x: x**2,jet_r),'Hot':cmap_xmap(lambda x: x**2,hot_r),'Gray':cmap_xmap(lambda x: x**2,gray_r),'Gnuplot':cmap_xmap(lambda x: x**2,coolheat_r),'Terrain':cmap_xmap(lambda x: x**2,terrain_r),'Winter':cmap_xmap(lambda x: x**2,winter_r)}        	
+    	self.cmapdic_r_sqrt={'Jet':cmap_xmap(lambda x: x**2,jet_r),'Hot':cmap_xmap(lambda x: x**2,hot_r),'Gray':cmap_xmap(lambda x: x**2,gray_r),'Gnuplot':cmap_xmap(lambda x: x**2,coolheat_r),'Terrain':cmap_xmap(lambda x: x**2,terrain_r),'Winter':cmap_xmap(lambda x: x**2,winter_r)}
