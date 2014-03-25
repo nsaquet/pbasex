@@ -299,7 +299,7 @@ class Datas():
     """
         	
     def image_for_display(self):
-    	dim=int(1.1*self.r)
+    	dim=int(1.05*self.r)
     	#Calculate new image in cartesian coordinates and return it for display
     	X,Y=np.meshgrid(np.arange(-dim,dim+1),np.arange(-dim,dim+1))
     	new_r=np.sqrt(X**2+Y**2).ravel()
@@ -434,7 +434,7 @@ def cart2pol_var(data,scale,center,r):
 	return polar
 
 def theta_f(x,y):
-	ang=np.arctan(np.fabs(x)/np.fabs(y))
+	ang=np.arctan2(np.fabs(x),np.fabs(y))
 	#Check for singularity and remap angles over [0 2pi]
 	indx=np.where(np.ravel(x)==0)[0]
 	indy=np.where(np.ravel(y)==0)[0]
