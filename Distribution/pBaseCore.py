@@ -65,6 +65,7 @@ class Datas():
         theta=theta_f(X,Y)
         r=np.sqrt(X**2+Y**2)
         self.datas=np.exp(-(r-80)**2/50)*eval_legendre(2,np.cos(theta))
+        self.datas[self.datas<0]=0.
         self.datas/=self.datas.max()
         #self.datas[self.datas<0.]=0.
         self.raw=self.datas
@@ -96,9 +97,10 @@ class Datas():
            #print scidata.shape, scidata.dtype.name
            self.raw=scidata
            self.datas=scidata
+           self.get_com()
            self.scale=ArrayInfos(self.datas)
         elif filepath[-4:]=='.dat' or filepath[-4:]=='.txt':
-            scidata = np.loadtxt(filepath,int)
+            scidata = np.loadtxt(filepath)
             ind=np.where(scidata.ravel()<0)[0]
             scidata.ravel()[ind]=0
             #print scidata.shape
@@ -269,37 +271,9 @@ class Datas():
         self.ang=angular
         self.ang_var=np.sqrt(np.abs(angular_var))
     	self.pes_error=self.ang_var[0,:]
-	"""
-		#Deprecated
-    	def image_for_display(self):
-    	dim=int(1.1*self.r)
-    	#Calculate new image in cartesian coordinates and return it for display
-    	X,Y=np.meshgrid(np.arange(-dim,dim+1),np.arange(-dim,dim+1))
-    	new_r=np.sqrt(X**2+Y**2).ravel()
-    	new_t=theta_f(X,Y).ravel()
-        del X,Y
-        #List of legendre polynoms
-        listLegendre=np.arange(0,self.lmax+1,(not self.odd)+1)
-        kvec,list=np.meshgrid(np.arange(Funcnumber),listLegendre)
-        K,Rad=np.meshgrid(kvec.T.ravel(),new_r)
-        K,Theta=np.meshgrid(kvec.T.ravel(),new_t)
-        del listLegendre,kvec
-            	
-    	Rad*=Rbin/float(self.r)
-    	func=np.exp(-(Rad-K*Bspace)**2/(2*Bwidth**2))
-    	leg=eval_legendre(list.T.ravel(),np.cos(Theta))*self.coefficients
-    	    	
-    	outdata=(func*leg).sum(axis=1)*new_r
-    	outdata[outdata<0]=0	
-    	if 2*dim+1<min(self.raw.shape):
-    		self.output=np.zeros_like(self.raw)
-        	self.output[self.center[1]-dim:self.center[1]+dim+1,self.center[0]-dim:self.center[0]+dim+1]=outdata.reshape((2*dim+1,2*dim+1))
-        else:
-        	self.output=outdata.reshape((2*dim+1,2*dim+1))
-    """
         	
     def image_for_display(self):
-    	dim=int(1.05*self.r)
+    	dim=int(self.r+1)
     	#Calculate new image in cartesian coordinates and return it for display
     	X,Y=np.meshgrid(np.arange(-dim,dim+1),np.arange(-dim,dim+1))
     	new_r=np.sqrt(X**2+Y**2).ravel()
@@ -316,11 +290,9 @@ class Datas():
     	del Rad,K
     	outdata=(func*leg).sum(axis=1)*new_r
     	outdata[outdata<0]=0
-    	out_dim_pos=np.array([np.array(self.center)+dim,np.array(self.center)+0.5*np.array(self.raw.shape)]).max(axis=0)
-    	out_dim_neg=np.array([np.array(self.center)-dim,np.array(self.center)-0.5*np.array(self.raw.shape)]).min(axis=0)
-    	self.output=np.zeros(out_dim_pos-out_dim_neg)
+    	self.output=np.zeros_like(self.raw)
     	self.output[self.center[1]-dim:self.center[1]+dim+1,self.center[0]-dim:self.center[0]+dim+1]=outdata.reshape((2*dim+1,2*dim+1))
-
+    	
 # Auxiliary function to map cartesian data to a polar plane
 #Change to G. Garcia function from IGOR
 def cart2pol(data,scale,center,r):
