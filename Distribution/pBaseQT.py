@@ -71,6 +71,23 @@ class pBaseForm(QtGui.QMainWindow):
         self.verticalLayout.setContentsMargins(5, 5, 5, 5)
         self.verticalLayout.setObjectName("verticalLayout")
         
+        #Design a choice in display
+        self.DisplayCLayout = QtGui.QHBoxLayout()
+        self.DisplayCLayout.setContentsMargins(5, 5, 5, 5)
+        self.DisplayCLayout.setObjectName("DisplayChoiceLayout")
+        self.label22 = QtGui.QLabel(self.groupBox)
+        self.label22.setObjectName("label22")
+        self.DisplayCLayout.addWidget(self.label22)
+        self.DisplayChoiceBox = QtGui.QComboBox(self.groupBox)
+        self.DisplayChoiceBox.setObjectName("DataChoiceBox")
+        self.DisplayChoiceBox.addItem("Original")
+        self.DisplayChoiceBox.addItem("Inverted")
+        self.DisplayCLayout.addWidget(self.DisplayChoiceBox)
+        self.DisplayCLayout.insertSpacing(2,15) 
+        self.verticalLayout.addLayout(self.DisplayCLayout)  
+        self.DisplayChoiceBox.activated[str].connect(self.changeDisplay) 
+        
+        
         #Design the polynom group box
         self.PolyGBox = QtGui.QGroupBox()
         self.PolyGBox.setFlat(True)
@@ -207,8 +224,9 @@ class pBaseForm(QtGui.QMainWindow):
         self.verticalLayout.addWidget(self.ColorBox)
         self.verticalLayout.setStretch(0, 1)
         self.verticalLayout.setStretch(1, 1)
-        self.verticalLayout.setStretch(2, 1.5)
-        self.verticalLayout.setStretch(3, 1)
+        self.verticalLayout.setStretch(2, 1)
+        self.verticalLayout.setStretch(3, 1.8)
+        self.verticalLayout.setStretch(4, 1)
         
         #Define the Main Tool Box: Invert|Save|Close buttons
         self.HBox = QtGui.QHBoxLayout()
@@ -294,6 +312,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.DataChoiceGBox.setTitle(QtGui.QApplication.translate("MainWindow", "Choice of Data for the inversion", None, QtGui.QApplication.UnicodeUTF8))
         self.label.setText(QtGui.QApplication.translate("MainWindow", "Max Legendre Polynoms:", None, QtGui.QApplication.UnicodeUTF8))
         self.label2.setText(QtGui.QApplication.translate("MainWindow", "Datas to be inverted:", None, QtGui.QApplication.UnicodeUTF8))
+        self.label22.setText(QtGui.QApplication.translate("MainWindow", "Datas displayed:", None, QtGui.QApplication.UnicodeUTF8))
         self.OddBox.setText(QtGui.QApplication.translate("MainWindow", "Odd", None, QtGui.QApplication.UnicodeUTF8))
         self.DataChoiceBox.setItemText(0, QtGui.QApplication.translate("MainWindow", "Original", None, QtGui.QApplication.UnicodeUTF8))
         self.DataChoiceBox.setItemText(1, QtGui.QApplication.translate("MainWindow", "Current", None, QtGui.QApplication.UnicodeUTF8))
@@ -428,6 +447,13 @@ class pBaseForm(QtGui.QMainWindow):
         if state == QtCore.Qt.Checked: self.plotsettings.IsR=True
         else: self.plotsettings.IsR=False
         self.display()
+    
+    def changeDisplay(self,state):
+    	if state=='Inverted':
+    		self.workflow.datas=self.workflow.output
+    	else:
+    		self.workflow.datas=self.workflow.raw
+    	self.display()
         
     def SqrtCM(self,state):
         """
@@ -530,7 +556,10 @@ class pBaseForm(QtGui.QMainWindow):
         if event.inaxes:
             x=event.xdata
             y=event.ydata
-            self.workflow.r=np.sqrt((x-self.workflow.center[0])**2+(y-self.workflow.center[1])**2)
+            #Limit the maximum r available to within the image.
+            smalldim=int(min(self.workflow.raw.shape-np.array([self.workflow.center[1],self.workflow.center[0]])))
+            smalldim=int(min(smalldim,min(self.workflow.center)))
+            self.workflow.r=min(np.sqrt((x-self.workflow.center[0])**2+(y-self.workflow.center[1])**2),smalldim-4)
             self.display() 
             
         
