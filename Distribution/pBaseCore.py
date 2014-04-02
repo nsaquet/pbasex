@@ -70,7 +70,7 @@ class Datas():
         #self.datas[self.datas<0.]=0.
         self.raw=self.datas
     
-        self.center=(0.,0.)
+        self.center=(128.,128.)
         self.get_com()
         self.r=100.
         self.scale=ArrayInfos(self.datas)
@@ -82,11 +82,26 @@ class Datas():
         self.pes_error=np.zeros(Rbin)
         self.ang_var=np.zeros((Angbin,self.get_NumberPoly()))
     
+    def reset(self):
+    	self.lmax=2
+    	self.odd=0
+    	self.raw=np.zeros((256,256))
+    	self.datas=self.raw
+    	self.center=(128.,128.)
+    	self.r=100.
+    	self.normed_pes=np.zeros(Rbin)
+        self.ang=np.zeros((Angbin,self.get_NumberPoly()))
+        self.output=np.zeros_like(self.datas)
+        self.pes_error=np.zeros(Rbin)
+        self.ang_var=np.zeros((Angbin,self.get_NumberPoly()))
+    	
+    
     def get_NumberPoly(self):
     	if not self.odd: return np.arange(0,self.lmax+1,2).shape[0]
     	else: return np.arange(0,self.lmax+1,1).shape[0]
         
     def OpenFile(self,filepath):
+    	self.reset()
         if filepath[-4:]=='.fit':
            hdulist = pyfits.open(filepath)
            #hdulist.info()
@@ -94,7 +109,6 @@ class Datas():
            hdulist.close()
            ind=np.where(scidata.ravel()<0)[0]
            scidata.ravel()[ind]=0
-           #print scidata.shape, scidata.dtype.name
            self.raw=scidata
            self.datas=scidata
            self.get_com()
