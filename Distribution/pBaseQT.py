@@ -14,6 +14,7 @@ import numpy as np
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigCanvas
 #from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg
 from matplotlib.figure import Figure
+from matplotlib.pyplot import figure
 import matplotlib.gridspec as gridspec
 import matplotlib.cm as cm
 import matplotlib.colors as colors
@@ -31,6 +32,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.workflow=Datas()
         self.file_path=''
         self.file_name=''
+        self.path_to_Basis=""
         #Create Main Window
         MainWindow.setObjectName("MainWindow")
         
@@ -363,7 +365,7 @@ class pBaseForm(QtGui.QMainWindow):
     	msgbox.setDefaultButton(fitsbutton)
     	msgbox.exec_()
     	if msgbox.clickedButton()==fitsbutton:
-    		outputname=self.file_path[:-4]+'_output.fit'
+    		outputname=self.file_name[:-4]+'_output.fit'
     		suggestedname=os.path.join(self.file_path,outputname)
         	fname, _ = QtGui.QFileDialog.getSaveFileName(self,self.tr("Save data file"),suggestedname,self.tr("Fits Files (*.fit)"))
         	if fname:
@@ -371,7 +373,7 @@ class pBaseForm(QtGui.QMainWindow):
         		self.workflow.SaveFileFits(fname)
         	else: self.statlabel.setText("Failed to save File")
     	elif msgbox.clickedButton()==datbutton:
-    		outputname=self.file_path[:-4]+'_output.dat'
+    		outputname=self.file_name[:-4]+'_output.dat'
     		suggestedname=os.path.join(self.file_path,outputname)
         	fname, _ = QtGui.QFileDialog.getSaveFileName(self,self.tr("Save data file"),suggestedname,self.tr("Dat Files (*.dat)"))
         	if fname:
@@ -379,17 +381,32 @@ class pBaseForm(QtGui.QMainWindow):
         		self.workflow.SaveFileDat(fname)
         	else: self.statlabel.setText("Failed to save File")
     	elif msgbox.clickedButton()==pdfbutton:
-    		outputname=self.file_path[:-4]+'_output.dat'
+    		outputname=self.file_name[:-4]+'_output.dat'
     		suggestedname=os.path.join(self.file_path,outputname)
         	fname, _ = QtGui.QFileDialog.getSaveFileName(self,self.tr("Save data file"),suggestedname,self.tr("PDF Files (*.pdf)"))
         	if fname:
         		fname_pes=fname[:-4]+'_PES.pdf'
         		fname_img=fname[:-4]+'_ImgInv.pdf'
         		self.statlabel.setText("Saving File %s" %fname_img)
-        		extent = self.axesPES.get_window_extent().transformed(self.fig.dpi_scale_trans.inverted())
-        		self.fig.savefig(fname_pes, bbox_inches=extent.expanded(1.2, 1.7))
-        		extent = self.axes.get_window_extent().transformed(self.fig.dpi_scale_trans.inverted())
-        		self.fig.savefig(fname_img, bbox_inches=extent.expanded(1.1, 1.1))
+        		
+        		fig=figure()
+        		axes=fig.add_subplot(111)
+        		axes.plot(self.workflow.normed_pes,'k')
+        		axes.set_yticks([0,0.5,1.])
+        		axes.set_xlim([0,self.workflow.r])
+        		fig.savefig(fname_pes,format='pdf')
+        		del fig,axes
+        		
+        		fig=figure(figsize=(6.,6.),dpi=150)
+        		axes=fig.add_subplot(1,1,1)
+        		palette=self.plotsettings.cmapdic[self.plotsettings.palettename]
+        		if self.plotsettings.IsSqrt and self.plotsettings.IsR: palette=self.plotsettings.cmapdic_r_sqrt[self.plotsettings.palettename]	
+        		axes.imshow(self.workflow.datas,origin='lower',cmap=palette,vmax=0.8*self.workflow.datas.max())
+        		nullfmt = NullFormatter()
+        		axes.yaxis.set_major_formatter(nullfmt)
+        		axes.xaxis.set_major_formatter(nullfmt)
+        		fig.savefig(fname_img,format='pdf')
+        		del fig,axes,palette
         		
         	else: self.statlabel.setText("Failed to save File")
         
@@ -507,7 +524,8 @@ class pBaseForm(QtGui.QMainWindow):
             if not self.plotsettings.IsFixed: 
                 self.statlabel.setText("Centering")
                 self.RunProcess()
-                while not self.process.isFinished(): QtCore.QCoreApplication.processEvents() 
+                while not self.process.isFinished(): QtCore.QCoreApplication.processEvents()
+            del self.process 
             self.statlabel.setText("Centered")
             self.progressBar.setVisible(False)
             self.display()
@@ -525,17 +543,18 @@ class pBaseForm(QtGui.QMainWindow):
     
     def InvertFn(self):
     	#Path to the basis file
-    	dpath = QtGui.QFileDialog.getExistingDirectory(self,self.tr("Basis Files Directory"),dir="~/")
+    	if not self.path_to_Basis:
+    		self.path_to_Basis= QtGui.QFileDialog.getExistingDirectory(self,self.tr("Basis Files Directory"),dir="~/")
     	self.progressBar.reset()
         self.progressBar.setVisible(True)
-    	self.process=InvertProcesser(self,dpath)
+    	self.process=InvertProcesser(self,self.path_to_Basis)
         QtCore.QObject.connect(self.process,QtCore.SIGNAL("progress(int)"),self.progressBar,QtCore.SLOT("setValue(int)"))
         if not self.process.isRunning():
             self.process.exiting = False
             self.process.start() 
         while not self.process.isFinished(): QtCore.QCoreApplication.processEvents()
+        del self.process
         self.progressBar.setVisible(False)
-    	
     	self.workflow.datas=self.workflow.output
     	self.display()
     
