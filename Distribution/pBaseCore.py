@@ -77,23 +77,21 @@ class Datas():
         
         #Output
         self.normed_pes=np.zeros(Rbin)
-        self.ang=np.zeros((Angbin,self.get_NumberPoly()))
+        self.ang=np.zeros((self.get_NumberPoly(),Angbin))
         self.output=np.zeros_like(self.datas)
         self.pes_error=np.zeros(Rbin)
-        self.ang_var=np.zeros((Angbin,self.get_NumberPoly()))
+        self.ang_var=np.zeros((self.get_NumberPoly(),Angbin))
     
     def reset(self):
-    	self.lmax=2
-    	self.odd=0
     	self.raw=np.zeros((256,256))
     	self.datas=self.raw
     	self.center=(128.,128.)
     	self.r=100.
     	self.normed_pes=np.zeros(Rbin)
-        self.ang=np.zeros((Angbin,self.get_NumberPoly()))
+        self.ang=np.zeros((self.get_NumberPoly(),Angbin))
         self.output=np.zeros_like(self.datas)
         self.pes_error=np.zeros(Rbin)
-        self.ang_var=np.zeros((Angbin,self.get_NumberPoly()))
+        self.ang_var=np.zeros((self.get_NumberPoly(),Angbin))
     	
     
     def get_NumberPoly(self):
@@ -147,10 +145,13 @@ class Datas():
     
     def SaveFileDat(self,filepath):
     	root=filepath[:-4]
-    	self.output.tofile(root+'_img_inv.dat')
-    	self.ang.tofile(root+'_ang.dat')
-    	self.ang_var.tofile(root+'_angvar.dat')
-        np.hstack((np.arange(Rbin),self.normed_pes,self.pes_error)).reshape((3,Rbin)).tofile(root+'_pes.dat')
+    	np.savetxt(root+'_pes.dat',np.hstack((np.arange(Rbin),self.normed_pes,self.pes_error)).reshape((3,Rbin)),fmt='%f')
+    	np.savetxt(root+'_img_inv.dat',self.output,fmt='%f')
+    	for beta in np.arange(1,self.get_NumberPoly()):
+    		if self.odd: i=beta
+    		else: i=beta+1
+    		np.savetxt(root+'_ang_b'+str(i)+'.dat',np.hstack((np.arange(Rbin),self.ang[beta,:],self.ang_var[beta,:])).reshape((3,Rbin)))
+        
         
     def get_com(self):
         datmax=self.datas.max()
