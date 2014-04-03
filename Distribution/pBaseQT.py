@@ -352,6 +352,8 @@ class pBaseForm(QtGui.QMainWindow):
         	self.statlabel.setText("Opening File %s" %fname)
         	self.workflow.OpenFile(fname)
         	self.statlabel.setText("Go !")
+        	self.workflow.lmax=self.PolyBox.value()
+        	self.workflow.odd=self.OddBox.isChecked()
         else: self.statlabel.setText("Failed to open File")
         self.display()
         
@@ -575,10 +577,12 @@ class pBaseForm(QtGui.QMainWindow):
         if event.inaxes:
             x=event.xdata
             y=event.ydata
-            #Limit the maximum r available to within the image.
-            smalldim=int(min(self.workflow.raw.shape-np.array([self.workflow.center[1],self.workflow.center[0]])))
-            smalldim=int(min(smalldim,min(self.workflow.center)))
-            self.workflow.r=min(np.sqrt((x-self.workflow.center[0])**2+(y-self.workflow.center[1])**2),smalldim-4)
+            if self.workflow.center==(event.xdata,event.ydata): self.workflow.r=10
+            else:
+	            #Limit the maximum r available to within the image.
+    	        smalldim=int(min(self.workflow.raw.shape-np.array([self.workflow.center[1],self.workflow.center[0]])))
+    	        smalldim=int(min(smalldim,min(self.workflow.center)))
+    	        self.workflow.r=min(np.sqrt((x-self.workflow.center[0])**2+(y-self.workflow.center[1])**2),smalldim-4)
             self.display() 
             
         
