@@ -346,12 +346,12 @@ class pBaseForm(QtGui.QMainWindow):
         self.SymButton.setText(QtGui.QApplication.translate("MainWindow", "Symmetrize V", None, QtGui.QApplication.UnicodeUTF8))
         self.ImageCenterBtn.setText(QtGui.QApplication.translate("MainWindow", "Center of the image", None, QtGui.QApplication.UnicodeUTF8))
         self.ColorBox.setTitle(QtGui.QApplication.translate("MainWindow", "Colormaps", None, QtGui.QApplication.UnicodeUTF8))
-        self.ColorMapBox.setItemText(0, QtGui.QApplication.translate("MainWindow", "Jet", None, QtGui.QApplication.UnicodeUTF8))
-        self.ColorMapBox.setItemText(1, QtGui.QApplication.translate("MainWindow", "Gnuplot", None, QtGui.QApplication.UnicodeUTF8))
-        self.ColorMapBox.setItemText(2, QtGui.QApplication.translate("MainWindow", "Gray", None, QtGui.QApplication.UnicodeUTF8))
-        self.ColorMapBox.setItemText(3, QtGui.QApplication.translate("MainWindow", "Hot", None, QtGui.QApplication.UnicodeUTF8))
-        self.ColorMapBox.setItemText(4, QtGui.QApplication.translate("MainWindow", "Winter", None, QtGui.QApplication.UnicodeUTF8))
-        self.ColorMapBox.setItemText(5, QtGui.QApplication.translate("MainWindow", "Terrain", None, QtGui.QApplication.UnicodeUTF8))
+        self.ColorMapBox.setItemText(0, QtGui.QApplication.translate("MainWindow", "Igor", None, QtGui.QApplication.UnicodeUTF8))
+        self.ColorMapBox.setItemText(1, QtGui.QApplication.translate("MainWindow", "Jet", None, QtGui.QApplication.UnicodeUTF8))
+        self.ColorMapBox.setItemText(2, QtGui.QApplication.translate("MainWindow", "Gnuplot", None, QtGui.QApplication.UnicodeUTF8))
+        self.ColorMapBox.setItemText(3, QtGui.QApplication.translate("MainWindow", "Gray", None, QtGui.QApplication.UnicodeUTF8))
+        self.ColorMapBox.setItemText(4, QtGui.QApplication.translate("MainWindow", "Hot", None, QtGui.QApplication.UnicodeUTF8))
+        self.ColorMapBox.setItemText(5, QtGui.QApplication.translate("MainWindow", "Winter", None, QtGui.QApplication.UnicodeUTF8))        
         self.InvColorBox.setText(QtGui.QApplication.translate("MainWindow", "Inverse Colors", None, QtGui.QApplication.UnicodeUTF8))
         self.SqrtColorBox.setText(QtGui.QApplication.translate("MainWindow", "Sqrt", None, QtGui.QApplication.UnicodeUTF8))
         self.InvertButton.setText(QtGui.QApplication.translate("MainWindow", "Invert !", None, QtGui.QApplication.UnicodeUTF8))
@@ -688,7 +688,7 @@ class InvertProcesser(QtCore.QThread):
 
 class PlotSettings():
     def __init__(self):
-        self.palettename='Jet'
+        self.palettename='Igor'
         self.IsSqrt=False
         self.IsR=False
         self.IsFixed=False
@@ -714,12 +714,12 @@ class PlotSettings():
     	gray = colors.LinearSegmentedColormap('mygray', cdict_gray,2048)
     	gray_r = colors.LinearSegmentedColormap('mygray_r', cdict_gray_r,2048)
     	
-    	cdict_terrain ={'red': ((0.0, 0.2, 0.2),(0.15, 0.0, 0.0),(0.25, 0.0, 0.0),(0.5, 1.0, 1.0),(0.75, 0.5, 0.5),(1.0, 1.0, 1.0)),
- 						'blue': ((0.0, 0.6, 0.6),(0.15, 1.0, 1.0),(0.25, 0.4, 0.4),(0.5, 0.6, 0.6),(0.75, 0.33, 0.33),(1.0, 1.0, 1.0)),
- 						'green': ((0.0, 0.2, 0.2),(0.15, 0.6, 0.6),(0.25, 0.8, 0.8),(0.5, 1.0, 1.0),(0.75, 0.36, 0.36),(1.0, 1.0, 1.0))
+    	cdict_terrain ={'red': ((0.0, 0., 0.),(0.17, 1.0, 1.0),(0.3, 1.0, 1.0),(0.46, 0.0, 0.0),(0.68, 0.0, 0.0),(0.87, 1.0, 1.0),(0.89, 1.0, 1.0),(0.97, 0.0, 0.0),(1.0, 0.0, 0.0)),
+ 			   'green': ((0.0, 0., 0.),(0.31, 1.0, 1.0),(0.51, 1.0, 1.0),(0.74, 0.35, 0.35),(0.87, 1.0, 1.0),(0.9, 1.0, 1.0),(1., 0., 0.)),
+ 			   'blue': ((0.0, 0., 0.),(0.5, 0.0, 0.0),(0.87, 1.0, 1.0),(1.0, 1.0, 1.0))
     					}
-    	cdict_terrain_r ={'red': ((0.0, 1., 1.),(0.25, 0.5, 0.5),(0.5, 1.0, 1.0),(0.75, 0.0, 0.0),(0.85, 0.0, 0.0),(1.0, 0.2, 0.2)),
- 						  'blue': ((0.0, 1., 1.),(0.25, 0.33, 0.33),(0.5, 0.6, 0.6),(0.75, 0.4, 0.4),(0.85, 1.0, 1.0),(1.0, 0.6, 0.6)),
+    	cdict_terrain_r ={'red': ((0.0, 0., 0.),(0.17, 0.0, 0.0),(0.3, 1.0, 1.0),(0.46, 1.0, 1.0),(0.68, 0.0, 0.0),(0.87, 0.0, 0.0),(0.89, 1.0, 1.0),(0.97, 1.0, 1.0),(1.0, 0.0, 0.0)),
+ 						  'blue': ((0.0, 1., 1.),(0.5, 1.0, 1.0),(0.87, 0.0, 0.0),(1.0, 0.0, 0.0)),
  						  'green': ((0.0, 1., 1.),(0.25, 0.36, 0.36),(0.5, 1.0, 1.0),(0.75, 0.8, 0.8),(0.85, 0.6, 0.6),(1.0, 0.2, 0.2))
     					 }
     	terrain = colors.LinearSegmentedColormap('myterrain', cdict_terrain,2048)
@@ -751,7 +751,7 @@ class PlotSettings():
  					}
  	jet = colors.LinearSegmentedColormap('myjet', cdict_jet,2048)
     	jet_r = colors.LinearSegmentedColormap('myjet_r', cdict_jet_r,2048)
-    	self.cmapdic={'Jet':jet,'Hot':hot,'Gray':gray,'Gnuplot':coolheat,'Terrain':terrain,'Winter':winter}
-    	self.cmapdic_sqrt={'Jet':cmap_xmap(lambda x: x**2,jet),'Hot':cmap_xmap(lambda x: x**2,hot),'Gray':cmap_xmap(lambda x: x**2,gray),'Gnuplot':cmap_xmap(lambda x: x**2,coolheat),'Terrain':cmap_xmap(lambda x: x**2,terrain),'Winter':cmap_xmap(lambda x: x**2,winter)}
-    	self.cmapdic_r={'Jet':jet_r,'Hot':hot_r,'Gray':gray_r,'Gnuplot':coolheat_r,'Terrain':terrain_r,'Winter':winter_r}
-    	self.cmapdic_r_sqrt={'Jet':cmap_xmap(lambda x: x**2,jet_r),'Hot':cmap_xmap(lambda x: x**2,hot_r),'Gray':cmap_xmap(lambda x: x**2,gray_r),'Gnuplot':cmap_xmap(lambda x: x**2,coolheat_r),'Terrain':cmap_xmap(lambda x: x**2,terrain_r),'Winter':cmap_xmap(lambda x: x**2,winter_r)}
+    	self.cmapdic={'Jet':jet,'Hot':hot,'Gray':gray,'Gnuplot':coolheat,'Igor':terrain,'Winter':winter}
+    	self.cmapdic_sqrt={'Jet':cmap_xmap(lambda x: x**2,jet),'Hot':cmap_xmap(lambda x: x**2,hot),'Gray':cmap_xmap(lambda x: x**2,gray),'Gnuplot':cmap_xmap(lambda x: x**2,coolheat),'Igor':cmap_xmap(lambda x: x**2,terrain),'Winter':cmap_xmap(lambda x: x**2,winter)}
+    	self.cmapdic_r={'Jet':jet_r,'Hot':hot_r,'Gray':gray_r,'Gnuplot':coolheat_r,'Igor':terrain_r,'Winter':winter_r}
+    	self.cmapdic_r_sqrt={'Jet':cmap_xmap(lambda x: x**2,jet_r),'Hot':cmap_xmap(lambda x: x**2,hot_r),'Gray':cmap_xmap(lambda x: x**2,gray_r),'Gnuplot':cmap_xmap(lambda x: x**2,coolheat_r),'Igor':cmap_xmap(lambda x: x**2,terrain_r),'Winter':cmap_xmap(lambda x: x**2,winter_r)}
