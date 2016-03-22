@@ -142,6 +142,26 @@ class pBaseForm(QtGui.QMainWindow):
         self.DataChoiceGBox.setLayout(self.DCLayout)
         self.verticalLayout.addWidget(self.DataChoiceGBox)   
         
+        #Set ellipticity
+        self.EllipticityGBox = QtGui.QGroupBox()
+        self.EllipticityGBox.setFlat(True)
+        self.EllipticityGBox.setObjectName("EllipticityBox")
+        self.ElLayout = QtGui.QHBoxLayout(self.EllipticityGBox)
+        self.ElLayout.setContentsMargins(5, 5, 5, 5)
+        self.ElLayout.setObjectName("EllipticityLayout")
+        self.ESlider = QtGui.QSlider(self.EllipticityGBox)
+        self.ESlider.setOrientation(QtCore.Qt.Horizontal)
+        self.ESlider.setTickInterval(10)
+        self.ESlider.setTickPosition(QtGui.QSlider.TicksBelow)
+        self.ESlider.setValue(100)
+        self.ESlider.setPageStep(1)
+        self.ESlider.setRange(80,125)
+        self.ESlider.valueChanged[int].connect(self.changeEValue)
+        self.ESlider.setObjectName("ESlider")
+        self.ElLayout.addWidget(self.ESlider)
+        self.ElLayout.insertSpacing(2,15) 
+        self.EllipticityGBox.setLayout(self.ElLayout)
+        self.verticalLayout.addWidget(self.EllipticityGBox)   
         
         #Define the Centering Tool Box
         self.CenterBox = QtGui.QGroupBox(self.groupBox)
@@ -312,6 +332,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.groupBox.setTitle(QtGui.QApplication.translate("MainWindow", "Treatments", None, QtGui.QApplication.UnicodeUTF8))
         self.PolyGBox.setTitle(QtGui.QApplication.translate("MainWindow", "Polynoms", None, QtGui.QApplication.UnicodeUTF8))
         self.DataChoiceGBox.setTitle(QtGui.QApplication.translate("MainWindow", "Choice of Data for the inversion", None, QtGui.QApplication.UnicodeUTF8))
+        self.EllipticityGBox.setTitle(QtGui.QApplication.translate("MainWindow", "Image Ellipticity", None, QtGui.QApplication.UnicodeUTF8))
         self.label.setText(QtGui.QApplication.translate("MainWindow", "Max Legendre Polynoms:", None, QtGui.QApplication.UnicodeUTF8))
         self.label2.setText(QtGui.QApplication.translate("MainWindow", "Datas to be inverted:", None, QtGui.QApplication.UnicodeUTF8))
         self.label22.setText(QtGui.QApplication.translate("MainWindow", "Datas displayed:", None, QtGui.QApplication.UnicodeUTF8))
@@ -344,7 +365,7 @@ class pBaseForm(QtGui.QMainWindow):
         
 
     def openFile(self):
-        fname, _ = QtGui.QFileDialog.getOpenFileName(self,self.tr("Open data file"),"~/",self.tr("Fit Files (*.fit);;Image Files (*.tiff *.jpg *.bmp);;Txt (*.txt *.dat)"))
+        fname, _ = QtGui.QFileDialog.getOpenFileName(self,self.tr("Open data file"),"~/",self.tr("Fit Files (*.fit *.fits);;Image Files (*.tiff *.jpg *.bmp);;Txt (*.txt *.dat)"))
         if fname:
         	file=QtCore.QFileInfo(fname)
         	self.file_path=file.path()
@@ -433,7 +454,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.axes.imshow(self.workflow.datas,extent=[0,ymax,0,xmax],origin='lower',cmap=palette,vmax=0.8*self.workflow.datas.max())
         
         if self.workflow.r!=0.:
-            xc,yc= paint_circle(self.workflow.center,self.workflow.r)
+            xc,yc= paint_circle(self.workflow.center,self.workflow.r,self.workflow.scale.ellipticity)
             scalarMap = cm.ScalarMappable(norm=colors.Normalize(vmin=0, vmax=256), cmap=palette)
             self.axes.plot(xc,yc,color=scalarMap.to_rgba(256),lw=1)
         
@@ -450,7 +471,7 @@ class pBaseForm(QtGui.QMainWindow):
         #Deal with display
         self.canvas.draw()
         del palette
-        self.statcoordinates.setText(u"Center: x={0[0]} , y={0[1]}.\t Radius: {1}".format(self.workflow.center,int(self.workflow.r)))
+        self.statcoordinates.setText(u"Center: x={0[0]} , y={0[1]}.\t Radius: {1} \t Ellipticity: {2}".format(self.workflow.center,int(self.workflow.r),self.workflow.scale.ellipticity))
         
     def OnChooseCM(self,text):
         """
@@ -568,6 +589,10 @@ class pBaseForm(QtGui.QMainWindow):
     	if not self.plotsettings.IsFixed: self.workflow.center=(self.workflow.center[0],value)
     	self.display()
     
+    def changeEValue(self,value):
+    	self.workflow.scale.ellipticity=value/100.
+    	self.display()
+    	
     def on_press(self,event):
         if event.inaxes and not self.plotsettings.IsFixed: 
             self.workflow.center=(event.xdata,event.ydata)
@@ -582,7 +607,7 @@ class pBaseForm(QtGui.QMainWindow):
 	            #Limit the maximum r available to within the image.
     	        smalldim=int(min(self.workflow.raw.shape-np.array([self.workflow.center[1],self.workflow.center[0]])))
     	        smalldim=int(min(smalldim,min(self.workflow.center)))
-    	        self.workflow.r=min(np.sqrt((x-self.workflow.center[0])**2+(y-self.workflow.center[1])**2),smalldim-4)
+    	        self.workflow.r=min(np.sqrt((x-self.workflow.center[0])**2+(y-self.workflow.center[1])**2),smalldim-4)/max(self.workflow.scale.ellipticity,1./self.workflow.scale.ellipticity)
             self.display() 
             
         
@@ -598,9 +623,9 @@ def cmap_xmap(function,cmap):
         assert (cdict[key][0]<0 or cdict[key][-1]>1), "Resulting indices extend out of the [0, 1] segment."
     return colors.LinearSegmentedColormap('name_sqrt',cdict,2048)
 
-def paint_circle(center,radius):
+def paint_circle(center,radius,ellipticity):
         theta=np.linspace(-np.pi,np.pi,1001)
-        return center[0]+radius*np.cos(theta),center[1]+radius*np.sin(theta)
+        return center[0]+radius*np.cos(theta),center[1]+radius*np.sin(theta)*ellipticity
 
 class CenterProcesser(QtCore.QThread):
     __errorHappened=False

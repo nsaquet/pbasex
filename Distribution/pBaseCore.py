@@ -27,6 +27,7 @@ class ArrayInfos():
 		self.Yfact=1
 		self.Rfact=max(self.Xfact,self.Yfact)
 		self.nR=1
+		self.ellipticity=1.0
 		self.update_nR()
 	
 	def update_nR(self):
@@ -75,6 +76,7 @@ class Datas():
         self.r=100.
         self.scale=ArrayInfos(self.datas)
         
+        
         #Output
         self.normed_pes=np.zeros(Rbin)
         self.ang=np.zeros((self.get_NumberPoly(),Angbin))
@@ -100,10 +102,17 @@ class Datas():
         
     def OpenFile(self,filepath):
     	self.reset()
-        if filepath[-4:]=='.fit':
+        if filepath[-4:]=='.fit' or filepath[-5:]=='.fits' :
+        
            hdulist = pyfits.open(filepath)
            #hdulist.info()
            scidata = hdulist[0].data
+           try:
+           	len(scidata)
+           except:
+           	print('Entry 0 not an image')
+           	scidata = hdulist[1].data
+           	len(scidata)
            hdulist.close()
            ind=np.where(scidata.ravel()<0)[0]
            scidata.ravel()[ind]=0
@@ -341,7 +350,7 @@ def cart2pol(data,scale,center,r):
 	rad=Rfact*np.concatenate([r*np.ones(2*r+1) for r in np.arange(Rbin)])
 	theta=np.concatenate([np.pi*np.arange(t)/t for t in 2*np.arange(Rbin)+1])
 	x=rad*np.cos(theta) + center[1]
-	y=-rad*np.sin(theta) + center[0]
+	y=-rad*np.sin(theta)*scale.ellipticity + center[0]
 	#Cubic interpolation
 	xpix=x/scale.Xfact
 	ypix=y/scale.Yfact
@@ -396,7 +405,7 @@ def cart2pol_var(data,scale,center,r):
 	rad=Rfact*np.concatenate([r*np.ones(2*r+1) for r in np.arange(Rbin)])
 	theta=np.concatenate([np.pi*np.arange(t)/t for t in 2*np.arange(Rbin)+1])
 	x=rad*np.cos(theta) + center[1]
-	y=-rad*np.sin(theta) + center[0]
+	y=-rad*np.sin(theta)*scale.ellipticity + center[0]
 	#Cubic interpolation
 	xpix=x/scale.Xfact
 	ypix=y/scale.Yfact
