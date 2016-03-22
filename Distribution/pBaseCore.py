@@ -158,7 +158,7 @@ class Datas():
     	np.savetxt(root+'_img_inv.dat',self.output,fmt='%f')
     	for beta in np.arange(1,self.get_NumberPoly()):
     		if self.odd: i=beta
-    		else: i=beta+1
+    		else: i=2*beta
     		np.savetxt(root+'_ang_b'+str(i)+'.dat',np.hstack((np.arange(Rbin),self.ang[beta,:],self.ang_var[beta,:])).reshape((3,Rbin)))
         
         

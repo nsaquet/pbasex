@@ -579,6 +579,7 @@ class pBaseForm(QtGui.QMainWindow):
         del self.process
         self.progressBar.setVisible(False)
     	self.workflow.datas=self.workflow.output
+    	self.DisplayChoiceBox.setCurrentIndex(1)
     	self.display()
     
     def changeXValue(self,value):
