@@ -161,7 +161,27 @@ class pBaseForm(QtGui.QMainWindow):
         self.ElLayout.addWidget(self.ESlider)
         self.ElLayout.insertSpacing(2,15) 
         self.EllipticityGBox.setLayout(self.ElLayout)
-        self.verticalLayout.addWidget(self.EllipticityGBox)   
+        self.verticalLayout.addWidget(self.EllipticityGBox) 
+        
+        #Set invert option
+        self.InvertOptGBox = QtGui.QGroupBox()
+        self.InvertOptGBox.setFlat(True)
+        self.InvertOptGBox.setObjectName("InvertOptionBox")
+        self.IOptLayout = QtGui.QHBoxLayout(self.InvertOptGBox)
+        self.IOptLayout.setContentsMargins(5, 5, 5, 5)
+        self.IOptLayout.setObjectName("InvertOptionLayout")
+        self.InvHalfBox = QtGui.QCheckBox(self.InvertOptGBox)
+        self.InvHalfBox.stateChanged.connect(self.ChangeHalfInvert)
+        self.InvHalfBox.setObjectName("InvHalfBox")
+        self.IOptLayout.addWidget(self.InvHalfBox)
+        self.WhichHalfBox = QtGui.QComboBox(self.InvertOptGBox)
+        self.WhichHalfBox.setObjectName("WhichHalfBox")
+        self.WhichHalfBox.addItem("Left")
+        self.WhichHalfBox.addItem("Right")
+        self.IOptLayout.addWidget(self.WhichHalfBox)
+        self.IOptLayout.insertSpacing(2,15) 
+        self.InvertOptGBox.setLayout(self.IOptLayout)
+        self.verticalLayout.addWidget(self.InvertOptGBox)   
         
         #Define the Centering Tool Box
         self.CenterBox = QtGui.QGroupBox(self.groupBox)
@@ -362,8 +382,9 @@ class pBaseForm(QtGui.QMainWindow):
         self.actionOpen.setShortcut(QtGui.QApplication.translate("MainWindow", "Ctrl+O", None, QtGui.QApplication.UnicodeUTF8))
         self.actionSave.setText(QtGui.QApplication.translate("MainWindow", "Save", None, QtGui.QApplication.UnicodeUTF8))
         self.actionSave.setShortcut(QtGui.QApplication.translate("MainWindow", "Ctrl+S", None, QtGui.QApplication.UnicodeUTF8))
+        self.InvertOptGBox.setTitle(QtGui.QApplication.translate("MainWindow", "Invert Options", None, QtGui.QApplication.UnicodeUTF8))
+        self.InvHalfBox.setText(QtGui.QApplication.translate("MainWindow", "1/2 image only", None, QtGui.QApplication.UnicodeUTF8))
         
-
     def openFile(self):
         fname, _ = QtGui.QFileDialog.getOpenFileName(self,self.tr("Open data file"),"~/",self.tr("Fit Files (*.fit *.fits);;Image Files (*.tiff *.jpg *.bmp);;Txt (*.txt *.dat)"))
         if fname:
@@ -506,7 +527,11 @@ class pBaseForm(QtGui.QMainWindow):
     def ChangeOdd(self,state):
         if state == QtCore.Qt.Checked: self.workflow.odd=1
         else: self.workflow.odd=0
-        
+    
+    def ChangeHalfInvert(self,state):
+        if state == QtCore.Qt.Checked: self.workflow.half=1
+        else: self.workflow.half=0
+    
     def ChangeLmax(self,number):
         self.workflow.lmax=number
     

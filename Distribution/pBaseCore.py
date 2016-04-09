@@ -55,6 +55,8 @@ class Datas():
     def __init__(self):
         self.lmax=2
         self.odd=0
+        self.half=0
+        self.whichhalf='Left'
         self.raw=2.*np.random.normal(0.5,size=(256,256))
         #Simulate a ring image
         x=np.arange(0,500)
