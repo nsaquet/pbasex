@@ -151,11 +151,11 @@ class pBaseForm(QtGui.QMainWindow):
         self.ElLayout.setObjectName("EllipticityLayout")
         self.ESlider = QtGui.QSlider(self.EllipticityGBox)
         self.ESlider.setOrientation(QtCore.Qt.Horizontal)
-        self.ESlider.setTickInterval(10)
+        self.ESlider.setTickInterval(5)
         self.ESlider.setTickPosition(QtGui.QSlider.TicksBelow)
         self.ESlider.setValue(100)
         self.ESlider.setPageStep(1)
-        self.ESlider.setRange(80,125)
+        self.ESlider.setRange(90,110)
         self.ESlider.valueChanged[int].connect(self.changeEValue)
         self.ESlider.setObjectName("ESlider")
         self.ElLayout.addWidget(self.ESlider)
@@ -633,7 +633,7 @@ class pBaseForm(QtGui.QMainWindow):
 	            #Limit the maximum r available to within the image.
     	        smalldim=int(min(self.workflow.raw.shape-np.array([self.workflow.center[1],self.workflow.center[0]])))
     	        smalldim=int(min(smalldim,min(self.workflow.center)))
-    	        self.workflow.r=min(np.sqrt((x-self.workflow.center[0])**2+(y-self.workflow.center[1])**2),smalldim-4)/max(self.workflow.scale.ellipticity,1./self.workflow.scale.ellipticity)
+    	        self.workflow.r=min(np.sqrt((x-self.workflow.center[0])**2+(y-self.workflow.center[1])**2),smalldim-1)/max(self.workflow.scale.ellipticity,1./self.workflow.scale.ellipticity)
             self.display() 
             
         
