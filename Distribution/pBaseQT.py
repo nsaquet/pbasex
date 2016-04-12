@@ -706,7 +706,10 @@ class InvertProcesser(QtCore.QThread):
     	elif self.gui.WhichHalfBox.currentText()=="Left":
     		polar=self.workflow.to_polar(dat)
     	elif self.gui.WhichHalfBox.currentText()=="Right":
-    		polar=self.workflow.to_polar(np.flipud(dat))
+    		center=np.copy(self.workflow.center)
+    		self.workflow.center=(dat.shape[0]-center[0],center[1])
+    		polar=self.workflow.to_polar(np.fliplr(dat))
+    		self.workflow.center=(center[0],center[1])
     	else: polar=self.workflow.to_polar(dat) 
     		
         self.gui.statlabel.setText("Polar Image")
