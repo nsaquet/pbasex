@@ -162,30 +162,11 @@ class Datas():
     		if self.odd: i=beta
     		else: i=2*beta
     		np.savetxt(root+'_ang_b'+str(i)+'.dat',np.hstack((np.arange(Rbin),self.ang[beta,:],self.ang_var[beta,:])).reshape((3,Rbin)))
-        
-        
+              
     def get_com(self):
         datmax=self.datas.max()
         mask=(self.datas>datmax*0.25)
         self.center=com(self.datas.T,mask.T)
-        
-    def Symmetrize(self,data):
-        """
-    		Symmetrise a 2_D circular selection vertically (ie about a horizontal axis). 
-    		Assume that the centre is mid-pixel (x0,y0) rather than at lower left corner
-    		of pixel x0,y0. Assume destination array bb[][] is pre-zeroed. Note that no 
-    		symmetrisation is needed horizontally since the Legendre polynomials are 
-    		already symmetric along the vertical axis. (Vertically being the polarisation 
-    		axis of the ligth, or the direction of propagation in the case of cpl).
-    	"""
-    	#Need to build up the selected indexes within self.r
-        yindex=np.arange(self.center[1]-self.r,self.center[1]+self.r,dtype=int)
-        xindex=np.arange(self.center[0]-self.r,self.center[0]+self.r,dtype=int)
-        for k,l in zip(xindex[round(len(xindex)/2.):],xindex[len(xindex)/2 -1::-1]): 
-        	yind=np.where((k-self.center[0])**2+(yindex-self.center[1])**2<self.r**2)[0]
-        	data.T[k,yindex[yind]]=0.5*(data.T[k,yindex[yind]]+data.T[l,yindex[yind]])
-        	data.T[l,yindex[yind]]=data.T[k,yindex[yind]]
-        #if len(xindex)%2: data.T[xindex[len(xindex)/2],yindex]+=data.T[xindex[len(xindex)/2],yindex]
         
     def AutoCenter(self):
         """
@@ -496,3 +477,22 @@ def ldist(X,lmax,odd,coeff):
 	else: 
 		if odd: return pl.reshape((X.shape[0],NL*Funcnumber))*coeff
 		else: return pl[:,:,0].reshape((X.shape[0],NL*Funcnumber))*coeff
+		
+def symmetrize(data,center,r):
+        """
+    		Symmetrise a 2_D circular selection vertically (ie about a horizontal axis). 
+    		Assume that the centre is mid-pixel (x0,y0) rather than at lower left corner
+    		of pixel x0,y0. Assume destination array bb[][] is pre-zeroed. Note that no 
+    		symmetrisation is needed horizontally since the Legendre polynomials are 
+    		already symmetric along the vertical axis. (Vertically being the polarisation 
+    		axis of the ligth, or the direction of propagation in the case of cpl).
+    	"""
+    	#Need to build up the selected indexes within self.r
+        yindex=np.arange(center[1]-r,center[1]+r,dtype=int)
+        xindex=np.arange(center[0]-r,center[0]+r,dtype=int)
+        for k,l in zip(xindex[round(len(xindex)/2.):],xindex[len(xindex)/2 -1::-1]): 
+        	yind=np.where((k-center[0])**2+(yindex-center[1])**2<r**2)[0]
+        	data.T[k,yindex[yind]]=0.5*(data.T[k,yindex[yind]]+data.T[l,yindex[yind]])
+        	data.T[l,yindex[yind]]=data.T[k,yindex[yind]]
+        return data
+        #if len(xindex)%2: data.T[xindex[len(xindex)/2],yindex]+=data.T[xindex[len(xindex)/2],yindex]

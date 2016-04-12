@@ -20,7 +20,7 @@ import matplotlib.cm as cm
 import matplotlib.colors as colors
 from matplotlib.ticker import NullFormatter
 
-from pBaseCore import Datas,theta_f
+from pBaseCore import Datas,theta_f,symmetrize
 
 waitCondition = QtCore.QWaitCondition()
 mutex = QtCore.QMutex()
@@ -81,7 +81,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.label22.setObjectName("label22")
         self.DisplayCLayout.addWidget(self.label22)
         self.DisplayChoiceBox = QtGui.QComboBox(self.groupBox)
-        self.DisplayChoiceBox.setObjectName("DataChoiceBox")
+        self.DisplayChoiceBox.setObjectName("DisplayChoiceBox")
         self.DisplayChoiceBox.addItem("Original")
         self.DisplayChoiceBox.addItem("Inverted")
         self.DisplayCLayout.addWidget(self.DisplayChoiceBox)
@@ -560,7 +560,7 @@ class pBaseForm(QtGui.QMainWindow):
     		symmetric along the vertical axis. (Vertically being the polarisation 
     		axis of the ligth, or the direction of propagation in the case of cpl).
     	"""
-        self.workflow.Symmetrize(self.workflow.datas)
+        self.workflow.datas=symmetrize(self.workflow.datas,self.workflow.center,self.workflow.r)
         self.statlabel.setText("Symmetrized")
         self.display()
     
@@ -695,10 +695,19 @@ class InvertProcesser(QtCore.QThread):
     	
     	if self.gui.DataChoiceBox.currentText()=="Original":
     		self.gui.statlabel.setText("Original") 
-    		polar=self.workflow.to_polar(self.workflow.raw)
+    		dat=np.copy(self.workflow.raw)
     	else:
     		self.gui.statlabel.setText("Current")
-    		polar=self.workflow.to_polar(self.workflow.datas)
+    		dat=dat=np.copy(self.workflow.datas)
+    	
+    	if not self.workflow.half:
+    		dat=symmetrize(dat,self.workflow.center,self.workflow.r)
+    		polar=self.workflow.to_polar(dat)
+    	elif self.gui.WhichHalfBox.currentText()=="Left":
+    		polar=self.workflow.to_polar(dat)
+    	elif self.gui.WhichHalfBox.currentText()=="Right":
+    		polar=self.workflow.to_polar(np.flipud(dat))
+    	else: polar=self.workflow.to_polar(dat) 
     		
         self.gui.statlabel.setText("Polar Image")
     	self.emit(QtCore.SIGNAL("progress(int)"),10)
