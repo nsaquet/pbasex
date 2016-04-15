@@ -44,14 +44,17 @@ class pBaseForm(QtGui.QMainWindow):
         self.Wplot = QtGui.QWidget()
         self.LPlot= QtGui.QVBoxLayout()
         self.LPlot.setContentsMargins(5, 5, 5, 5)
-        self.fig = Figure((6., 6.), dpi=150)
+        self.fig = Figure((6., 6.), dpi=150,frameon=False)
         self.canvas = FigCanvas(self.fig)
         self.canvas.setParent(self.Wplot)
-        gs=gridspec.GridSpec(2,1,height_ratios=[4,1])
-        gs.update(hspace=0.2)
-        self.axes=self.fig.add_subplot(gs[0])
-        self.axesPES=self.fig.add_subplot(gs[1])
-        gs.tight_layout(self.fig,pad=0.1)
+        self.gs=gridspec.GridSpec(2,1,height_ratios=[4,1],hspace=0.1,bottom=0.05,top=0.995)
+        self.axes=self.fig.add_subplot(self.gs[0])
+        self.axesPES=self.fig.add_subplot(self.gs[1])
+        self.axes.xaxis.get_label().set_fontsize(8)
+        self.axes.yaxis.get_label().set_fontsize(8)
+        self.axesPES.xaxis.get_label().set_fontsize(8)
+        self.axesPES.yaxis.get_label().set_fontsize(8)
+        self.gs.tight_layout(self.fig,pad=0.1)
         self.Wplot.setObjectName("Image")
         #mpl_toolbar = NavigationToolbar(self.canvas, self.Wplot)
         #self.LPlot.addWidget(mpl_toolbar)
@@ -493,6 +496,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.canvas.draw()
         del palette
         self.statcoordinates.setText(u"Center: x={0[0]} , y={0[1]}.\t Radius: {1} \t Ellipticity: {2}".format(self.workflow.center,int(self.workflow.r),self.workflow.scale.ellipticity))
+        self.gs.tight_layout(self.fig,pad=0.1)
         
     def OnChooseCM(self,text):
         """
