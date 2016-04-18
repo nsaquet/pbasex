@@ -14,7 +14,7 @@ import numpy as np
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigCanvas
 #from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg
 from matplotlib.figure import Figure
-from matplotlib.pyplot import figure
+from matplotlib.pyplot import figure,setp
 import matplotlib.gridspec as gridspec
 import matplotlib.cm as cm
 import matplotlib.colors as colors
@@ -44,27 +44,26 @@ class pBaseForm(QtGui.QMainWindow):
         self.Wplot = QtGui.QWidget()
         self.LPlot= QtGui.QVBoxLayout()
         self.LPlot.setContentsMargins(5, 5, 5, 5)
-        self.fig = Figure((6., 6.), dpi=150,frameon=False)
+        self.fig = Figure((6., 7.), dpi=150,frameon=False,tight_layout=False)
         self.canvas = FigCanvas(self.fig)
         self.canvas.setParent(self.Wplot)
+        self.canvas.setSizePolicy(QtGui.QSizePolicy.Expanding,QtGui.QSizePolicy.Expanding)
         self.gs=gridspec.GridSpec(2,1,height_ratios=[4,1],hspace=0.1,bottom=0.05,top=0.995)
         self.axes=self.fig.add_subplot(self.gs[0])
         self.axesPES=self.fig.add_subplot(self.gs[1])
-        self.axes.xaxis.get_label().set_fontsize(8)
-        self.axes.yaxis.get_label().set_fontsize(8)
-        self.axesPES.xaxis.get_label().set_fontsize(8)
-        self.axesPES.yaxis.get_label().set_fontsize(8)
         self.gs.tight_layout(self.fig,pad=0.1)
         self.Wplot.setObjectName("Image")
         #mpl_toolbar = NavigationToolbar(self.canvas, self.Wplot)
         #self.LPlot.addWidget(mpl_toolbar)
         self.LPlot.addWidget(self.canvas)
         self.Wplot.setLayout(self.LPlot)
+        
         # Bind the 'pick' event for clicking on one of the bars
         self.canvas.mpl_connect('button_press_event', self.on_press)
         
         #Create the Tool Box on the side
         self.VerticalWidget = QtGui.QWidget()
+        self.VerticalWidget.setFixedWidth(350)
         self.VerticalBox = QtGui.QVBoxLayout()
         self.VerticalBox.setContentsMargins(5, 5, 5, 5)
         self.VerticalBox.setObjectName("verticalLayout")
@@ -492,11 +491,13 @@ class pBaseForm(QtGui.QMainWindow):
         self.axesPES.plot(self.workflow.normed_pes,'k')
         self.axesPES.set_yticks([0,0.5,1.])
         self.axesPES.set_xlim([0,self.workflow.r])
+        setp(self.axesPES.get_xticklabels(),fontsize=10)
+        setp(self.axesPES.get_yticklabels(),fontsize=10)
+        self.axesPES.patch.set_alpha(0.1)
         #Deal with display
         self.canvas.draw()
         del palette
         self.statcoordinates.setText(u"Center: x={0[0]} , y={0[1]}.\t Radius: {1} \t Ellipticity: {2}".format(self.workflow.center,int(self.workflow.r),self.workflow.scale.ellipticity))
-        self.gs.tight_layout(self.fig,pad=0.1)
         
     def OnChooseCM(self,text):
         """
@@ -771,7 +772,6 @@ class PlotSettings():
     	cdict_hot_r =cm.hot_r._segmentdata.copy()
     	hot = colors.LinearSegmentedColormap('myhot', cdict_hot,2048)
     	hot_r = colors.LinearSegmentedColormap('myhot_r', cdict_hot_r,2048)
-    	
     	cdict_winter ={'blue': ((0.0, 1.0, 1.0),(0.125, 0.4, 0.4), (1.0, 0.25, 0.25)),
  					   'green': ((0.0, 0.2, 0.2),(0.125, 0.6, 0.4), (1.0, 1.0, 1.0)),
  					   'red': ((0.0, 0.0, 0.0),(0.25, 0., 0.), (1.0, 0.0, 0.0))
