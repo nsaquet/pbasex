@@ -44,7 +44,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.Wplot = QtGui.QWidget()
         self.LPlot= QtGui.QVBoxLayout()
         self.LPlot.setContentsMargins(5, 5, 5, 5)
-        self.fig = Figure((6., 7.), dpi=150,frameon=False,tight_layout=False)
+        self.fig = Figure((6., 6.6), dpi=150,frameon=False)
         self.canvas = FigCanvas(self.fig)
         self.canvas.setParent(self.Wplot)
         self.canvas.setSizePolicy(QtGui.QSizePolicy.Expanding,QtGui.QSizePolicy.Expanding)
@@ -419,7 +419,8 @@ class pBaseForm(QtGui.QMainWindow):
         		self.workflow.SaveFileFits(fname)
         	else: self.statlabel.setText("Failed to save File")
     	elif msgbox.clickedButton()==datbutton:
-    		outputname=self.file_name[:-4]+'_output.dat'
+    		if self.file_name[-5:]=='.fits': outputname=self.file_name[:-5]+'_output.dat'
+    		else: outputname=self.file_name[:-4]+'_output.dat'
     		suggestedname=os.path.join(self.file_path,outputname)
         	fname, _ = QtGui.QFileDialog.getSaveFileName(self,self.tr("Save data file"),suggestedname,self.tr("Dat Files (*.dat)"))
         	if fname:
