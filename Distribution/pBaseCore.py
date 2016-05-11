@@ -261,10 +261,10 @@ class Datas():
                 angular_var[l][r]=sum(fradial*fradial*coefs_var[:,l])
         
         ang0=angular[0,:]
-        ang0_var=angular_var[0,:]
         angular[:,ang0<=1e-8]=0.0
         angular_var[:,ang0<=1e-8]=0.0
         ang0[ang0<=1e-8]=0.0
+        ang0_var=angular_var[0,:]
         
         a0=ang0[ang0>1e-6]
     	angular[1:,ang0>1e-6]/=a0
