@@ -66,7 +66,7 @@ class Datas():
         Y-=250 #Center the ring
         theta=theta_f(X,Y)
         r=np.sqrt(X**2+Y**2)
-        self.datas=np.exp(-(r-80)**2/25)*(1+2*eval_legendre(2,np.cos(theta)))
+        self.datas=np.exp(-(r-80)**2/25)*(1+0.1*eval_legendre(2,np.cos(theta)))
         self.datas[self.datas<0]=0.
         self.datas/=self.datas.max()
         #self.datas[self.datas<0.]=0.
@@ -235,7 +235,7 @@ class Datas():
     	return u
     
     def to_polar(self,data):
-    	return (cart2pol(data,self.scale,self.center,self.r),cart2pol_var(data,self.scale,self.center,self.r))
+    	return cart2pol(data,self.scale,self.center,self.r)
     	
     def Invert(self,polar,u):
         #Resolve Basis*coeff=polar_dat
@@ -328,8 +328,6 @@ def cart2pol(data,scale,center,r):
 	Rfact=nR/float(Rbin)
 	scale.Rfact=Rfact
 	
-	polar=np.array([],dtype='f8')
-	
 	rad=Rfact*np.concatenate([r*np.ones(2*r+1) for r in np.arange(Rbin)])
 	theta=np.concatenate([np.pi*np.arange(t)/t for t in 2*np.arange(Rbin)+1])
 	x=rad*np.cos(theta) + center[1]
@@ -341,7 +339,9 @@ def cart2pol(data,scale,center,r):
 	iy=ypix.astype('int')
 	dx=xpix-ix
 	dy=ypix-iy
-	polar=np.zeros_like(rad)
+	
+	polar=np.zeros_like(rad,dtype='f8')
+	polar_var=np.zeros_like(rad,dtype='f8')
 	
 	i,j=np.meshgrid(np.arange(-1,3),np.arange(-1,3))
 	i=i.ravel()
@@ -355,62 +355,8 @@ def cart2pol(data,scale,center,r):
 	cub=cubic(I-dx.reshape((dx.shape[0],1)))*cubic(dy.reshape((dy.shape[0],1))-J)
 	dat=data.ravel()[(IXI*scale.nY+IYJ).ravel()].reshape(IYJ.shape)
 	polar+=(dat*cub).sum(axis=1)
-	return polar
-
-def cart2pol_var(data,scale,center,r):
-
-	"""
-		Cubic interpolation
-		Fastest implementation of the cubic interpolation so far for an array
-	"""
-	def cubic(y):
-		p0=(y+2)**3
-    		p0[p0<0]=0
-    		p1 = (y+1)**3
-    		p1[p1<0]=0
-    		p2 = y**3
-    		p2[p2<0]=0
-    		p3 =(y-1)**3
-    		p3[p3<0]=0
-    		return (p0-4.*p1+6.*p2-4.*p3)/6.
-	
-	"""
-		Adapt the  selected area size to polar basis size
-	"""
-	nR=min(r,scale.nR)
-	if nR>Rbin: nR=Rbin #Security
-	
-	Rfact=nR/float(Rbin)
-	scale.Rfact=Rfact
-	
-	polar=np.array([],dtype='f8')
-	
-	rad=Rfact*np.concatenate([r*np.ones(2*r+1) for r in np.arange(Rbin)])
-	theta=np.concatenate([np.pi*np.arange(t)/t for t in 2*np.arange(Rbin)+1])
-	x=rad*np.cos(theta) + center[1]
-	y=-rad*np.sin(theta)*scale.ellipticity + center[0]
-	#Cubic interpolation
-	xpix=x/scale.Xfact
-	ypix=y/scale.Yfact
-	ix=xpix.astype('int')
-	iy=ypix.astype('int')
-	dx=xpix-ix
-	dy=ypix-iy
-	polar=np.zeros_like(rad)
-	
-	i,j=np.meshgrid(np.arange(-1,3),np.arange(-1,3))
-	i=i.ravel()
-	j=j.ravel()
-	I,IX=np.meshgrid(i,ix)
-	J,IY=np.meshgrid(i,iy)
-	IXI=IX+I
-	IYJ=IY+J
-	rule1=(IXI<scale.nX) & (IXI>=0)
-	rule2=(IYJ<scale.nY) & (IYJ>=0)
-	cub=cubic(I-dx.reshape((dx.shape[0],1)))*cubic(dy.reshape((dy.shape[0],1))-J)
-	dat=data.ravel()[(IXI*scale.nY+IYJ).ravel()].reshape(IYJ.shape)
-	polar+=(dat*cub*cub).sum(axis=1)
-	return polar
+	polar_var+=(dat*cub*cub).sum(axis=1)
+	return (polar,polar_var)
 
 def theta_f(x,y):
 	ang=np.arctan2(np.fabs(x),np.fabs(y))
