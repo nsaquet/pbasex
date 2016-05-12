@@ -259,21 +259,22 @@ class Datas():
             for l in np.arange(NL):
                 angular[l][r]=sum(fradial*coefs[:,l])
                 angular_var[l][r]=sum(fradial*fradial*coefs_var[:,l])
-        
+
+        rad=rad*(Rbin/float(self.r))
         ang0=angular[0,:]
-        angular[:,ang0<=1e-8]=0.0
-        angular_var[:,ang0<=1e-8]=0.0
-        ang0[ang0<=1e-8]=0.0
+        angular[:,ang0<=0]=0.0
+        angular_var[:,ang0<=0]=0.0
         ang0_var=angular_var[0,:]
         
-        a0=ang0[ang0>1e-6]
-    	angular[1:,ang0>1e-6]/=a0
-        angular_var[1:,ang0>1e-6]/=(a0**2)
-        angular_var[1:,ang0>1e-6]+=(angular[1:,ang0>1e-6]**2)*ang0_var[ang0>1e-6]/(a0**4)
+        a0=ang0[ang0>0]
+    	angular[1:,ang0>0]/=a0
+        angular_var[1:,ang0>0]/=(a0**2)
+        angular_var[1:,ang0>0]+=(angular[1:,ang0>0]**2)*ang0_var[ang0>0]/(a0**4)
         
         pmax=(ang0*rad**2).max()
-        self.normed_pes=ang0*rad**2 /pmax
-        angular_var*=(rad**2 /pmax)**2
+        angular[0,:]=ang0*rad**2 /pmax
+        angular_var[0,:]*=(rad**2 /pmax)**2
+        self.normed_pes=angular[0,:]
         self.ang=angular
         self.ang_var=np.sqrt(np.abs(angular_var))
     	self.pes_error=self.ang_var[0,:]
