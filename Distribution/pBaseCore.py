@@ -249,8 +249,8 @@ class Datas():
         
         #Angular Matrix is of size NLxNR where NL is the number of Legendre polynoms and Nr the radial binning
         NL=self.get_NumberPoly()
-        angular=np.zeros((NL,Angbin),dtype='float')
-        angular_var=np.zeros((NL,Angbin),dtype='float')
+        angular=np.zeros((NL,Angbin),dtype='f8')
+        angular_var=np.zeros((NL,Angbin),dtype='f8')
         coefs=self.coefficients.reshape((Funcnumber,NL))
         coefs_var=self.coefficients_var.reshape((Funcnumber,NL))
 
@@ -327,7 +327,7 @@ def cart2pol(data,scale,center,r):
 	Rfact=nR/float(Rbin)
 	scale.Rfact=Rfact
 	
-	polar=np.array([])
+	polar=np.array([],dtype='f8')
 	
 	rad=Rfact*np.concatenate([r*np.ones(2*r+1) for r in np.arange(Rbin)])
 	theta=np.concatenate([np.pi*np.arange(t)/t for t in 2*np.arange(Rbin)+1])
@@ -382,7 +382,7 @@ def cart2pol_var(data,scale,center,r):
 	Rfact=nR/float(Rbin)
 	scale.Rfact=Rfact
 	
-	polar=np.array([])
+	polar=np.array([],dtype='f8')
 	
 	rad=Rfact*np.concatenate([r*np.ones(2*r+1) for r in np.arange(Rbin)])
 	theta=np.concatenate([np.pi*np.arange(t)/t for t in 2*np.arange(Rbin)+1])
