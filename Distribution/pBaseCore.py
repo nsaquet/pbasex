@@ -220,19 +220,23 @@ class Datas():
     	if not self.odd: filenamescore=''.join(['P%i' %i for i in np.arange(0,self.lmax+1,2)])
     	else:filenamescore=''.join(['P%i' %i for i in np.arange(0,self.lmax+1)])
     	fileextension='.dat'
-    	fname='U'+filenamescore+fileextension
-    	Ufilename=join(path,fname)
+    	fname=filenamescore+fileextension
+    	Ufilename=join(path,'U'+fname)
+        #Vfilename=join(path,'V'+fname)
+        #Sfilename=join(path,'S'+fname)
     	#Generate Basis file if not existing
-    	if not (isfile(Ufilename)): 
-    	    print 'files missing'
-    	    return -1
+        #if not (isfile(Ufilename) or isfile(Vfilename) or isfile(Sfilename)):
+        #    print 'files missing'
+        #    print Ufilename,Vfilename,Sfilename
+        #    return -1
     	
     	#Loading file as a vector as in PBaseX.
     	M=Rbin*Angbin  #correspond to the polar array dimension in the basis file NR=440 NTH=440
     	N=self.get_NumberPoly()*Funcnumber #Number of polynoms by the number of function set to NR/2.
     	u=np.fromfile(Ufilename,dtype=np.float64).reshape((M,N))
-    	
-    	return u
+        #v=np.fromfile(Vfilename,dtype=np.float64).reshape((N,N))
+        #s=np.fromfile(Sfilename,dtype=np.float64).reshape((N))
+        return u #,v,s
     
     def to_polar(self,data):
     	return (cart2pol(data,self.scale,self.center,self.r),cart2pol_var(data,self.scale,self.center,self.r))
@@ -242,38 +246,44 @@ class Datas():
         self.coefficients,residuts,siz,singulars=np.linalg.lstsq(u,polar[0])       #Need to build up angular distribution and PES
         self.coefficients_var,residuts,siz,singulars=np.linalg.lstsq(u*u,polar[1])
         del residuts,siz,singulars,polar,u
-                         
+
+        #self.coefficients,self.coefficients_var = svd_solve(u,v,s,polar)
+
         width=2*Bwidth**2
         rad=np.arange(Rbin)
         kvector=np.arange(Funcnumber)
         
         #Angular Matrix is of size NLxNR where NL is the number of Legendre polynoms and Nr the radial binning
         NL=self.get_NumberPoly()
-        angular=np.zeros((NL,Angbin),dtype='float')
-        angular_var=np.zeros((NL,Angbin),dtype='float')
+        angular=np.zeros((NL,Angbin),dtype='f8')
+        angular_var=np.zeros((NL,Angbin),dtype='f8')
         coefs=self.coefficients.reshape((Funcnumber,NL))
         coefs_var=self.coefficients_var.reshape((Funcnumber,NL))
 
         for r in rad:
-            fradial=np.exp(-(r*Rbin/float(self.r)-Bspace*kvector)**2/width)
+            ir=r*Rbin/float(self.r)
+            kmin=max(0,ir//Bspace -5)
+            kmax=min(Funcnumber,ir//Bspace +6)
+            fradial=np.exp(-(ir-Bspace*kvector[kmin:kmax])**2/width)
             for l in np.arange(NL):
-                angular[l][r]=sum(fradial*coefs[:,l])
-                angular_var[l][r]=sum(fradial*fradial*coefs_var[:,l])
-        
+                angular[l][r]=sum(fradial*coefs[kmin:kmax,l])
+                angular_var[l][r]=sum(fradial*fradial*coefs_var[kmin:kmax,l])
+    
+        rad=rad*(Rbin/float(self.r))
         ang0=angular[0,:]
-        angular[:,ang0<=1e-8]=0.0
-        angular_var[:,ang0<=1e-8]=0.0
-        ang0[ang0<=1e-8]=0.0
+        angular[:,ang0<=1e-6]=0.0
+        angular_var[:,ang0<=1e-6]=0.0
         ang0_var=angular_var[0,:]
         
-        a0=ang0[ang0>1e-6]
+        a0=ang0[ang0>0]
     	angular[1:,ang0>1e-6]/=a0
         angular_var[1:,ang0>1e-6]/=(a0**2)
         angular_var[1:,ang0>1e-6]+=(angular[1:,ang0>1e-6]**2)*ang0_var[ang0>1e-6]/(a0**4)
         
         pmax=(ang0*rad**2).max()
-        self.normed_pes=ang0*rad**2 /pmax
-        angular_var*=(rad**2 /pmax)**2
+        angular[0,:]*=rad**2 /pmax
+        angular_var[0,:]*=(rad**2 /pmax)**2
+        self.normed_pes=angular[0,:]
         self.ang=angular
         self.ang_var=np.sqrt(np.abs(angular_var))
     	self.pes_error=self.ang_var[0,:]
@@ -327,7 +337,7 @@ def cart2pol(data,scale,center,r):
 	Rfact=nR/float(Rbin)
 	scale.Rfact=Rfact
 	
-	polar=np.array([])
+	polar=np.array([],dtype='f8')
 	
 	rad=Rfact*np.concatenate([r*np.ones(2*r+1) for r in np.arange(Rbin)])
 	theta=np.concatenate([np.pi*np.arange(t)/t for t in 2*np.arange(Rbin)+1])
@@ -382,7 +392,7 @@ def cart2pol_var(data,scale,center,r):
 	Rfact=nR/float(Rbin)
 	scale.Rfact=Rfact
 	
-	polar=np.array([])
+	polar=np.array([],dtype='f8')
 	
 	rad=Rfact*np.concatenate([r*np.ones(2*r+1) for r in np.arange(Rbin)])
 	theta=np.concatenate([np.pi*np.arange(t)/t for t in 2*np.arange(Rbin)+1])
@@ -495,3 +505,10 @@ def symmetrize(data,center,r):
         	data.T[l,yindex[yind]]=data.T[k,yindex[yind]]
         return data
         #if len(xindex)%2: data.T[xindex[len(xindex)/2],yindex]+=data.T[xindex[len(xindex)/2],yindex]
+
+def svd_solve(u,v,s,polar):
+    c=np.dot(u.T,polar[0])
+    c_v=np.dot(u.T*u.T,polar[1])
+    w=np.divide(c,s)
+    w_v=np.divide(c_v,s*s)
+    return np.dot(v,w),np.dot(v*v,w)
