@@ -66,7 +66,7 @@ class Datas():
         Y-=250 #Center the ring
         theta=theta_f(X,Y)
         r=np.sqrt(X**2+Y**2)
-        self.datas=np.exp(-(r-80)**2/50)*eval_legendre(2,np.cos(theta))
+        self.datas=np.exp(-(r-80)**2/25)*(1+2*eval_legendre(2,np.cos(theta)))
         self.datas[self.datas<0]=0.
         self.datas/=self.datas.max()
         #self.datas[self.datas<0.]=0.
