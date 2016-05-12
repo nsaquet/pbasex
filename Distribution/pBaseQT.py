@@ -20,7 +20,7 @@ import matplotlib.cm as cm
 import matplotlib.colors as colors
 from matplotlib.ticker import NullFormatter
 
-from pBaseCore import Datas,theta_f,symmetrize
+from pBaseCore import Datas,theta_f,symmetrize,Rbin
 
 waitCondition = QtCore.QWaitCondition()
 mutex = QtCore.QMutex()
@@ -51,6 +51,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.gs=gridspec.GridSpec(2,1,height_ratios=[4,1],hspace=0.1,bottom=0.05,top=0.995)
         self.axes=self.fig.add_subplot(self.gs[0])
         self.axesPES=self.fig.add_subplot(self.gs[1])
+        self.axesPES2=self.axesPES.twinx()
         self.gs.tight_layout(self.fig,pad=0.1)
         self.Wplot.setObjectName("Image")
         #mpl_toolbar = NavigationToolbar(self.canvas, self.Wplot)
@@ -489,7 +490,9 @@ class pBaseForm(QtGui.QMainWindow):
         self.axes.xaxis.set_major_formatter(nullfmt)
         self.axes.tick_params(bottom='off',top='off',left='off',right='off')
         #Deal with PES
-        self.axesPES.plot(self.workflow.normed_pes,'k')
+        #self.axesPES.plot(self.workflow.normed_pes,'k')
+        self.axesPES.errorbar(np.arange(Rbin),self.workflow.normed_pes,yerr=self.workflow.ang_var[0,:],fmt='k')
+        self.axesPES2.errorbar(np.arange(Rbin),self.workflow.ang[1,:],yerr=self.workflow.ang_var[1,:],fmt='+r')
         self.axesPES.set_yticks([0,0.5,1.])
         self.axesPES.set_xlim([0,self.workflow.r])
         setp(self.axesPES.get_xticklabels(),fontsize=10)
@@ -692,8 +695,9 @@ class InvertProcesser(QtCore.QThread):
         
     def run(self):
     	self.gui.statlabel.setText("Start the inversion procedure")
-    	base=self.workflow.LoadBasis(self.path)
-    	if len(base.shape)<2: 
+        #U,V,S=self.workflow.LoadBasis(self.path)
+        U=self.workflow.LoadBasis(self.path)
+    	if len(U.shape)<2:
     		QtGui.QMessageBox.warning(self,"No Basis","Basis file don't exist yet !!! \n Please build it first. :(")
     		return 0
     	self.gui.statlabel.setText("Basis Loaded")
@@ -721,10 +725,10 @@ class InvertProcesser(QtCore.QThread):
         self.gui.statlabel.setText("Polar Image")
     	self.emit(QtCore.SIGNAL("progress(int)"),10)
     	
-        self.workflow.Invert(polar,base)
+        self.workflow.Invert(polar,U)
         self.gui.statlabel.setText("Fitted")
     	self.emit(QtCore.SIGNAL("progress(int)"),15)
-    	del polar,base
+    	del polar,U #,V,S
     	
         self.workflow.image_for_display()
         self.gui.statlabel.setText("Image inverted")
