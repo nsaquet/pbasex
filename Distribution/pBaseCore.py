@@ -147,7 +147,7 @@ class Datas():
         else: print "Incorrect data file format"
         
     def SaveFileFits(self,filepath):
-    	hdu_pes=pyfits.ImageHDU(np.array([np.arange(self.normed_pes.shape[0]),self.normed_pes,self.pes_error]))
+    	hdu_pes=pyfits.ImageHDU(np.array([self.radial,self.normed_pes,self.pes_error]))
     	hdu_ang=pyfits.ImageHDU(self.ang)
     	hdu_ang_var=pyfits.ImageHDU(self.ang_var)
     	hdu_out=pyfits.PrimaryHDU(self.output)
@@ -161,12 +161,12 @@ class Datas():
     
     def SaveFileDat(self,filepath):
     	root=filepath[:-4]
-    	np.savetxt(root+'_pes.dat',np.hstack((np.arange(Rbin),self.normed_pes,self.pes_error)).reshape((3,Rbin)),fmt='%f')
+    	np.savetxt(root+'_pes.dat',np.hstack((self.radial,self.normed_pes,self.pes_error)).reshape((3,Rbin)),fmt='%f')
     	np.savetxt(root+'_img_inv.dat',self.output,fmt='%f')
     	for beta in np.arange(1,self.get_NumberPoly()):
     		if self.odd: i=beta
     		else: i=2*beta
-    		np.savetxt(root+'_ang_b'+str(i)+'.dat',np.hstack((np.arange(Rbin),self.ang[beta,:],self.ang_var[beta,:])).reshape((3,Rbin)))
+    		np.savetxt(root+'_ang_b'+str(i)+'.dat',np.hstack((self.radial,self.ang[beta,:],self.ang_var[beta,:])).reshape((3,Rbin)))
               
     def get_com(self):
         datmax=self.datas.max()
