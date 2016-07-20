@@ -625,14 +625,14 @@ def weave_image_for_display(data):
 						dx=ix-(double)xc;
 						rad=sqrt(dx*dx+dy*dy);
 						sum=0.0;
-						if (rad<dr){
+						if (rad<(int)dr){
 							thta=theta_f(dx,dy);
-							kmin=(int)(rad/Rfact/Bspace)-5;
+							kmin=(int)(rad/(double)Rfact/Bspace)-5;
 							if(kmin<0) kmin=0;
-							kmax=(int)(rad/Rfact/Bspace)+6;
+							kmax=(int)(rad/(double)Rfact/Bspace)+6;
 							if(kmax>Funcnumber) kmax=Funcnumber;
 							for(ik=kmin;ik<kmax;ik++){
-								func=exp(-(rad/Rfact-ik*Bspace)*(rad/Rfact-ik*Bspace)/width);
+								func=exp(-(rad/(double)Rfact-ik*Bspace)*(rad/(double)Rfact-ik*Bspace)/width);
 								leg=ldist(thta,coeff,pl,NL,odd,ik);
 								leg*=func;
 								sum+=leg;
