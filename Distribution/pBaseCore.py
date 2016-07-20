@@ -217,28 +217,6 @@ class Datas():
         r_yind=int(2*y0)-yind
         
         return sum(self.datas[xind,yind]*self.datas[r_xind,r_yind])
-    
-    def LoadBasis(self,path):
-    	"""
-    		Look for Basis file and load it. We need only the initial basis for leastsq
-    	"""
-    	#Build basis file name
-    	if not self.odd: filenamescore=''.join(['P%i' %i for i in np.arange(0,self.lmax+1,2)])
-    	else:filenamescore=''.join(['P%i' %i for i in np.arange(0,self.lmax+1)])
-    	fileextension='.dat'
-    	fname='U'+filenamescore+fileextension
-    	Ufilename=join(path,fname)
-    	#Generate Basis file if not existing
-    	if not (isfile(Ufilename)): 
-    	    print 'files missing'
-    	    return -1
-    	
-    	#Loading file as a vector as in PBaseX.
-    	M=Rbin*Angbin  #correspond to the polar array dimension in the basis file NR=440 NTH=440
-    	N=self.get_NumberPoly()*Funcnumber #Number of polynoms by the number of function set to NR/2.
-    	u=np.fromfile(Ufilename,dtype=np.float64).reshape((M,N))
-    	
-    	return u
     	
     def LoadBasis_svd(self,path):
     	"""
@@ -265,73 +243,184 @@ class Datas():
     	return u,v,s
     
     def to_polar(self,data):
-    	return cart2pol(data,self.scale,self.center,self.r)
+    	return weave_cart2pol(self,data)
     	
-    def Invert(self,polar,u):
+    def weave_invert(self,polar,basis):
         #Resolve Basis*coeff=polar_dat
-        self.coefficients,residuts,siz,singulars=sp.linalg.lstsq(u,polar[0],lapack_driver='gelss')       #Need to build up angular distribution and PES
-        self.coefficients_var,residuts,siz,singulars=sp.linalg.lstsq(u**2,polar[1],lapack_driver='gelss')
-        del residuts,siz,singulars,polar,u
+        wi=(1/basis[2])*(np.dot(basis[0].T,polar[0]))
+        self.coefficients = np.dot(basis[1],wi)
+        wi_var=(1/(basis[2]*basis[2]))*(np.dot(basis[0].T*basis[0].T,polar[1]))
+        self.coefficients_var = np.dot(basis[1]*basis[1],wi_var) 
+        del wi,wi_var,polar,basis
                          
         width=2*Bwidth**2
-        rad=np.arange(Rbin,dtype='f16')
-        rad=np.sqrt(rad*self.r**2/float(Rbin))
-        kvector=np.arange(Funcnumber)
-        
+        Rfact=self.r**2/float(Rbin)**2
         #Angular Matrix is of size NLxNR where NL is the number of Legendre polynoms and Nr the radial binning
         NL=self.get_NumberPoly()
-        angular=np.zeros((NL,Angbin))
-        angular_var=np.zeros((NL,Angbin),dtype='f16')
-        coefs=self.coefficients.reshape((Funcnumber,NL))
-        coefs_var=self.coefficients_var.reshape((Funcnumber,NL))
-
-        for ir in np.arange(Rbin,dtype='f16'):
-            fradial=np.exp(-(rad[ir]*Rbin/float(self.r)-Bspace*kvector)**2/width)
-            for l in np.arange(NL):
-                angular[l][ir]=sum(fradial*coefs[:,l])
-                angular_var[l][ir]=sum(fradial*fradial*coefs_var[:,l])
-
-        ang0=angular[0,:]
-        angular[:,ang0<=1e-3]=0.0
-        angular_var[:,ang0<=1e-3]=0.0
-        a0=angular[0,:]
-        ind=np.where(a0>0)[0]
-
-        a0_var=angular_var[0,ind]
-    	angular[1:,ind]/=a0[ind]
-        angular_var[1:,ind]= angular_var[1:,ind]/a0[ind]/a0[ind] + (angular[1:,ind]**2)*a0_var/(a0[ind]**4) 
+        angular=np.zeros((NL,Rbin))
+        angular_var=np.zeros((NL,Rbin))
+        coeff=self.coefficients
+        coeff_var=self.coefficients_var
         
-        pmax=(a0*rad).max()
-        angular[0,:]*=rad/pmax
-        angular_var=np.sqrt(np.abs(angular_var))
-        angular_var[0,:]*=rad/pmax
+        code =	"""
+					using namespace std;
+					int kmin,kmax,ir,ik,il;
+					double pmax,rad,func,a0,a0_var,ai,vi;
+					
+					pmax=0.0;
+					for(ir=0;ir<Rbin;ir++){
+						rad=sqrt((double)(ir*Rfact*Rbin));
+						kmin=(int)(rad/Bspace/sqrt(Rfact))-5;
+						if(kmin<0) kmin=0;
+						kmax=(int)(rad/Bspace/sqrt(Rfact))+6;
+						if(kmax>Funcnumber) kmax=Funcnumber;
+					
+						for(ik=kmin;ik<kmax;ik++){
+							func=exp(-(rad/sqrt(Rfact)-ik*Bspace)*(rad/sqrt(Rfact)-ik*Bspace)/width);						
+							for(il=0;il<NL;il++){
+								angular(il,ir)+=coeff(ik*NL+il)*func;
+								angular_var(il,ir)+=coeff_var(ik*NL+il)*func*func;
+							}
+						}
+						a0=angular(0,ir);
+						a0_var=angular_var(0,ir);
+						if(a0<=1e-3){
+							a0=0.0;
+							a0_var=0.0;
+							for(il=0;il<NL;il++){
+								angular(il,ir)=0.0; 
+								angular_var(il,ir)=0.0;							
+							}
+						}
+						else{
+							for(il=1;il<NL;il++){
+								ai=angular(il,ir);
+								angular(il,ir)=ai/a0;
+								vi=angular_var(il,ir);
+								angular_var(il,ir)=vi/a0/a0+ai*ai/a0/a0/a0/a0*a0_var;
+							}
+						}
+		
+						if((a0*rad)>pmax) pmax=a0*rad;
+					}		
+					for(ir=0;ir<Rbin;ir++){
+						rad=sqrt((double)(ir*Rfact*Rbin));
+						angular(0,ir)*=(rad/pmax);
+						for(il=0;il<NL;il++){
+							angular_var(il,ir)=sqrt(angular_var(il,ir));
+							}
+						angular_var(0,ir)*=(rad/pmax);
+					}
+				"""
+        
+        weave.inline(code,arg_names=['Rbin','Rfact','Bspace','Funcnumber','width','NL','angular','angular_var','coeff','coeff_var'], type_converters=converters.blitz, extra_compile_args =['-stdlib=libc++ -std=gnu++11'], compiler='gcc',verbose=0)
         
         self.normed_pes=angular[0,:]
         self.ang=angular
         self.ang_var=angular_var
-    	self.pes_error=self.ang_var[0,:]
-    	self.radial=rad
+        self.pes_error=self.ang_var[0,:]
+        self.radial=np.sqrt(np.arange(Rbin)*self.r**2/float(Rbin))
         	
-    def image_for_display(self):
-    	dim=int(self.r+1)
-    	#Calculate new image in cartesian coordinates and return it for display
-    	X,Y=np.meshgrid(np.arange(-dim,dim+1),np.arange(-dim,dim+1))
-    	new_r=np.sqrt(X**2+Y**2).ravel()
-    	new_t=theta_f(X,Y).ravel()
-        del X,Y
-        #List of legendre polynoms
-        leg=ldist(new_t,self.lmax,self.odd,self.coefficients)
-        temp=np.concatenate([k*np.ones(self.get_NumberPoly()) for k in np.arange(Funcnumber)])
-        K,Rad=np.meshgrid(temp,new_r)
-        del temp,new_t
-    	
-    	Rad*=Rbin/float(self.r)
-    	func=np.exp(-(Rad-K*Bspace)**2/(2*Bwidth**2))
-    	del Rad,K
-    	outdata=(func*leg).sum(axis=1)*new_r
-    	outdata[outdata<0]=0
+    def weave_image_for_display(self):
     	self.output=np.zeros_like(self.raw)
-    	self.output[self.center[1]-dim:self.center[1]+dim+1,self.center[0]-dim:self.center[0]+dim+1]=outdata.reshape((2*dim+1,2*dim+1))
+    	nX=self.scale.nX
+    	nY=self.scale.nY
+    	yc=self.center[1]
+    	xc=self.center[0]
+    	dr=self.r
+    	width=2*Bwidth**2
+    	NL=self.get_NumberPoly()
+    	odd=self.odd
+    	coeff=self.coefficients
+    	Imrz=self.output.ravel()
+    	pl=np.zeros(NL+1)
+    	Rfact=(dr/float(Rbin))
+    	support_code = 	"""
+							inline double theta_f(double x,double y){
+								double thta;
+								thta=atan(fabs(x)/fabs(y));
+								if (x<0&&y>0) thta=2.0*M_PI-thta;
+								if (x>0&&y<0) thta=M_PI-thta;
+								if (x<0&&y<0) thta=M_PI+thta;
+								if(x==0&&y>0) thta=0.0;
+								if(x==0&&y<0) thta=M_PI;
+								if(y==0&&x>0) thta=M_PI/2.0;
+								if(y==0&&x<0) thta=3.0*M_PI/2.0;
+								if(x==0&&y==0) thta=2.0*M_PI;
+								return thta;
+							};
+						
+							inline double ldist(double X, blitz::Array<double, 1> coeff, double pl[], int npl, int odd, int ik){
+								double v=0.0;
+								int i,j,index,NL;
+								double twox,f2,f1,d,x;
+							
+								if(odd) NL=npl+1;
+								else NL=npl/2+1;
+							
+								x=(float)cos(X);
+								pl[0]=1.0;
+								pl[1]=x;
+								if (npl >= 2) {
+									twox=2.0*x;
+									f2=x;
+									d=1.0;
+									for (j=2;j <= npl ;j++) {
+										f1=d++;
+										f2 += twox;
+										pl[j]=(f2*pl[j-1]-f1*pl[j-2])/d;
+									}
+								}
+								for (i=0; i<=npl; i++){
+									if((i%2)){
+										if(odd)	v += coeff(ik*NL+i)*pl[i];
+									}
+									else{
+										if(odd)	v += coeff(ik*NL+i)*pl[i];
+										else{
+											index=i/2;
+											v += coeff(ik*NL+index)*pl[i];
+										}
+									}
+								}
+								return v;
+							};
+						"""
+    	code =	"""
+					using namespace std;
+					int kmin,kmax,ir,ik,il;
+					double rad,func,dy,dx,thta,leg,sum,*pl;
+					pl=(double*)calloc(NL+1,sizeof(double)); // Allocate Legendre polynomials
+				
+					for(int iz=0;iz<nY;iz++){
+						dy=iz-(double)yc;
+						for(int ix=xc;ix<nX;ix++){
+							dx=ix-(double)xc;
+							rad=sqrt(dx*dx+dy*dy);
+							sum=0.0;
+							if (rad<(int)dr){
+								thta=theta_f(dx,dy);
+								kmin=(int)(rad/(double)Rfact/Bspace)-5;
+								if(kmin<0) kmin=0;
+								kmax=(int)(rad/(double)Rfact/Bspace)+6;
+								if(kmax>Funcnumber) kmax=Funcnumber;
+								for(ik=kmin;ik<kmax;ik++){
+									func=exp(-(rad/(double)Rfact-ik*Bspace)*(rad/(double)Rfact-ik*Bspace)/width);
+									leg=ldist(thta,coeff,pl,NL,odd,ik);
+									leg*=func;
+									sum+=leg;
+								}
+								if(sum>=0) Imrz(iz*nY+ix)=sum*rad;
+								else Imrz(iz*nY+ix)=0.0;
+								Imrz(iz*nY+2*(double)xc-ix)=Imrz(iz*nY+ix);
+							}
+							else Imrz(iz*nY+ix)=0.0;
+						}
+					}
+					free(pl);
+				"""
+    	weave.inline(code,arg_names=['nY','nX','yc','xc','dr','Rfact','Bspace','Funcnumber','width','coeff','NL','odd','Imrz'], type_converters=converters.blitz, extra_compile_args =['-stdlib=libc++ -std=gnu++11'], compiler='gcc',support_code=support_code,verbose=0)
+    	self.output=Imrz.reshape(self.raw.shape)
     	
 # Auxiliary function to map cartesian data to a polar plane
 #Change to G. Garcia function from IGOR
@@ -395,24 +484,24 @@ def cart2pol(data,scale,center,r):
 	polar_var+=(dat*cub*cub).sum(axis=1)
 	return (polar,polar_var)
 
-def weave_cart2pol(data,scale,center,r):
-	nR=min(r,scale.nR)
+def weave_cart2pol(struct,data):
+	nR=min(struct.r,struct.scale.nR)
 	if nR>Rbin: nR=Rbin #Security
 	Rfact=(nR/float(Rbin))
-	scale.Rfact=Rfact
+	struct.scale.Rfact=Rfact
 	
 	#Norm datas before cubic interpolation:
 	data/=data.max()
 	
-	yc=center[1]
-	xc=center[0]
+	yc=struct.center[1]
+	xc=struct.center[0]
 	polar=np.zeros(Rbin**2)
 	polar_var=np.zeros(Rbin**2,dtype='f8')
-	ell=scale.ellipticity
-	Xfact=scale.Xfact
-	Yfact=scale.Yfact
-	nX=scale.nX
-	nY=scale.nY
+	ell=struct.scale.ellipticity
+	Xfact=struct.scale.Xfact
+	Yfact=struct.scale.Yfact
+	nX=struct.scale.nX
+	nY=struct.scale.nY
 	dat=np.copy(data.ravel(order='C').astype('float'))
 	support_code = 	"""
 						inline double cubic(double x){
@@ -470,190 +559,8 @@ def weave_cart2pol(data,scale,center,r):
 					}
 				}
 			"""
-	weave.inline(code,arg_names=['polar','polar_var','dat','Rbin','Rfact','ell','Xfact','Yfact','nX','nY','yc','xc'], type_converters=converters.blitz, extra_compile_args =['-stdlib=libc++ -std=gnu++11'], compiler='gcc',support_code=support_code,verbose=1)
+	weave.inline(code,arg_names=['polar','polar_var','dat','Rbin','Rfact','ell','Xfact','Yfact','nX','nY','yc','xc'], type_converters=converters.blitz, extra_compile_args =['-stdlib=libc++ -std=gnu++11'], compiler='gcc',support_code=support_code,verbose=0)
 	return (polar,polar_var)
-
-def weave_invert_svd(data,path,polar):
-	u,v,s = data.LoadBasis_svd(path)
-	wi=(1/s)*(np.dot(u.T,polar[0]))
-	data.coefficients = np.dot(v,wi)
-	wi_var=(1/(s*s))*(np.dot(u.T*u.T,polar[1]))
-	data.coefficients_var = np.dot(v*v,wi_var) 
-	
-	width=2*Bwidth**2
-	Rfact=data.r**2/float(Rbin)**2
-	print data.r, Rbin,Rfact
-	#Angular Matrix is of size NLxNR where NL is the number of Legendre polynoms and Nr the radial binning
-	NL=data.get_NumberPoly()
-	angular=np.zeros((NL,Rbin))
-	angular_var=np.zeros((NL,Rbin))
-	coeff=data.coefficients
-	coeff_var=data.coefficients_var
-	code =	"""
-				using namespace std;
-				int kmin,kmax,ir,ik,il;
-				double pmax,rad,func,a0,a0_var,ai,vi;
-				
-				pmax=0.0;
-				for(ir=0;ir<Rbin;ir++){
-					rad=sqrt((double)(ir*Rfact*Rbin));
-					kmin=(int)(rad/Bspace/sqrt(Rfact))-5;
-					if(kmin<0) kmin=0;
-					kmax=(int)(rad/Bspace/sqrt(Rfact))+6;
-					if(kmax>Funcnumber) kmax=Funcnumber;
-					
-					for(ik=kmin;ik<kmax;ik++){
-						func=exp(-(rad/sqrt(Rfact)-ik*Bspace)*(rad/sqrt(Rfact)-ik*Bspace)/width);						
-						for(il=0;il<NL;il++){
-							angular(il,ir)+=coeff(ik*NL+il)*func;
-							angular_var(il,ir)+=coeff_var(ik*NL+il)*func*func;
-						}
-					}
-					a0=angular(0,ir);
-					a0_var=angular_var(0,ir);
-					if(a0<=1e-3){
-						a0=0.0;
-						a0_var=0.0;
-						for(il=0;il<NL;il++){
-							angular(il,ir)=0.0; 
-							angular_var(il,ir)=0.0;							
-						}
-					}
-					else{
-						for(il=1;il<NL;il++){
-							ai=angular(il,ir);
-							angular(il,ir)=ai/a0;
-							vi=angular_var(il,ir);
-							angular_var(il,ir)=vi/a0/a0+ai*ai/a0/a0/a0/a0*a0_var;
-						}
-					}
-		
-					if((a0*rad)>pmax) pmax=a0*rad;
-				}		
-				for(ir=0;ir<Rbin;ir++){
-					rad=sqrt((double)(ir*Rfact*Rbin));
-					angular(0,ir)*=(rad/pmax);
-					for(il=0;il<NL;il++){
-						angular_var(il,ir)=sqrt(angular_var(il,ir));
-						}
-					angular_var(0,ir)*=(rad/pmax);
-				}
-			"""
-	weave.inline(code,arg_names=['Rbin','Rfact','Bspace','Funcnumber','width','NL','angular','angular_var','coeff','coeff_var'], type_converters=converters.blitz, extra_compile_args =['-stdlib=libc++ -std=gnu++11'], compiler='gcc',verbose=1)
-
-	data.normed_pes=angular[0,:]
-	data.ang=angular
-	data.ang_var=angular_var
-	data.pes_error=data.ang_var[0,:]
-	return data
-
-def weave_image_for_display(data):
-	data.output=np.zeros_like(data.raw)
-	nX=data.scale.nX
-	nY=data.scale.nY
-	yc=data.center[1]
-	xc=data.center[0]
-	dr=data.r
-	width=2*Bwidth**2
-	NL=data.get_NumberPoly()
-	odd=data.odd
-	coeff=data.coefficients
-	Imrz=np.zeros_like(data.raw).ravel()
-	pl=np.zeros(NL+1)
-	Rfact=(dr/float(Rbin))
-	
-	support_code = 	"""
-						inline double theta_f(double x,double y){
-							double thta;
-							thta=atan(fabs(x)/fabs(y));
-							if (x<0&&y>0) thta=2.0*M_PI-thta;
-							if (x>0&&y<0) thta=M_PI-thta;
-							if (x<0&&y<0) thta=M_PI+thta;
-							if(x==0&&y>0) thta=0.0;
-							if(x==0&&y<0) thta=M_PI;
-							if(y==0&&x>0) thta=M_PI/2.0;
-							if(y==0&&x<0) thta=3.0*M_PI/2.0;
-							if(x==0&&y==0) thta=2.0*M_PI;
-							return thta;
-						};
-						
-						inline double ldist(double X, blitz::Array<double, 1> coeff, double pl[], int npl, int odd, int ik){
-							double v=0.0;
-							int i,j,index,NL;
-							double twox,f2,f1,d,x;
-							
-							if(odd) NL=npl+1;
-							else NL=npl/2+1;
-							
-							x=(float)cos(X);
-							pl[0]=1.0;
-							pl[1]=x;
-							if (npl >= 2) {
-								twox=2.0*x;
-								f2=x;
-								d=1.0;
-								for (j=2;j <= npl ;j++) {
-									f1=d++;
-									f2 += twox;
-									pl[j]=(f2*pl[j-1]-f1*pl[j-2])/d;
-								}
-							}
-							for (i=0; i<=npl; i++){
-								if((i%2)){
-									if(odd)	v += coeff(ik*NL+i)*pl[i];
-								}
-								else{
-									if(odd)	v += coeff(ik*NL+i)*pl[i];
-									else{
-										index=i/2;
-										v += coeff(ik*NL+index)*pl[i];
-									}
-								}
-							}
-							return v;
-						};
-					"""
-	code =	"""
-				using namespace std;
-				int kmin,kmax,ir,ik,il;
-				double rad,func,dy,dx,thta,leg,sum,*pl;
-				pl=(double*)calloc(NL+1,sizeof(double)); // Allocate Legendre polynomials
-				
-				for(int iz=0;iz<nY;iz++){
-					dy=iz-(double)yc;
-					for(int ix=xc;ix<nX;ix++){
-						dx=ix-(double)xc;
-						rad=sqrt(dx*dx+dy*dy);
-						sum=0.0;
-						if (rad<dr){
-							thta=theta_f(dx,dy);
-							kmin=(int)(rad/Rfact/Bspace)-5;
-							if(kmin<0) kmin=0;
-							kmax=(int)(rad/Rfact/Bspace)+6;
-							if(kmax>Funcnumber) kmax=Funcnumber;
-							for(ik=kmin;ik<kmax;ik++){
-								func=exp(-(rad/Rfact-ik*Bspace)*(rad/Rfact-ik*Bspace)/width);
-								leg=ldist(thta,coeff,pl,NL,odd,ik);
-								leg*=func;
-								sum+=leg;
-							}
-							if(sum>=0) Imrz(iz*nY+ix)=sum*rad;
-							else Imrz(iz*nY+ix)=0.0;
-							Imrz(iz*nY+2*(double)xc-ix)=Imrz(iz*nY+ix);
-						}
-						else Imrz(iz*nY+ix)=0.0;
-					}
-				}
-				free(pl);
-			"""
-	weave.inline(code,arg_names=['nY','nX','yc','xc','dr','Rfact','Bspace','Funcnumber','width','coeff','NL','odd','Imrz'], type_converters=converters.blitz, extra_compile_args =['-stdlib=libc++ -std=gnu++11'], compiler='gcc',support_code=support_code,verbose=1)
-	
-	data.output=Imrz.reshape(data.raw.shape)
-	return data
-
-	
-	
-
 
 def theta_f(x,y):
 	ang=np.arctan2(np.fabs(x),np.fabs(y))

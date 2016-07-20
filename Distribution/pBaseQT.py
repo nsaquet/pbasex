@@ -20,7 +20,7 @@ import matplotlib.cm as cm
 import matplotlib.colors as colors
 from matplotlib.ticker import NullFormatter
 
-from pBaseCore import Datas,theta_f,symmetrize
+from pBaseCore import Datas,symmetrize
 
 waitCondition = QtCore.QWaitCondition()
 mutex = QtCore.QMutex()
@@ -489,7 +489,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.axes.xaxis.set_major_formatter(nullfmt)
         self.axes.tick_params(bottom='off',top='off',left='off',right='off')
         #Deal with PES
-        self.axesPES.plot(self.workflow.normed_pes,'k')
+        self.axesPES.plot(self.workflow.radial,self.workflow.normed_pes,'k')
         self.axesPES.set_yticks([0,0.5,1.])
         self.axesPES.set_xlim([0,self.workflow.r])
         setp(self.axesPES.get_xticklabels(),fontsize=10)
@@ -692,8 +692,8 @@ class InvertProcesser(QtCore.QThread):
         
     def run(self):
     	self.gui.statlabel.setText("Start the inversion procedure")
-    	base=self.workflow.LoadBasis(self.path)
-    	if len(base.shape)<2: 
+    	base=self.workflow.LoadBasis_svd(self.path)
+    	if len(base)<2: 
     		QtGui.QMessageBox.warning(self,"No Basis","Basis file don't exist yet !!! \n Please build it first. :(")
     		return 0
     	self.gui.statlabel.setText("Basis Loaded")
@@ -721,12 +721,12 @@ class InvertProcesser(QtCore.QThread):
         self.gui.statlabel.setText("Polar Image")
     	self.emit(QtCore.SIGNAL("progress(int)"),10)
     	
-        self.workflow.Invert(polar,base)
+        self.workflow.weave_invert(polar,base)
         self.gui.statlabel.setText("Fitted")
     	self.emit(QtCore.SIGNAL("progress(int)"),15)
     	del polar,base
     	
-        self.workflow.image_for_display()
+        self.workflow.weave_image_for_display()
         self.gui.statlabel.setText("Image inverted")
     	self.emit(QtCore.SIGNAL("progress(int)"),20)
 
