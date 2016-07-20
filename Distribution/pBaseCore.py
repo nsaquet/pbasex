@@ -147,7 +147,7 @@ class Datas():
         else: print "Incorrect data file format"
         
     def SaveFileFits(self,filepath):
-    	hdu_pes=pyfits.ImageHDU(np.array([np.arange(self.normed_pes.shape[0]),self.normed_pes,self.pes_error]))
+    	hdu_pes=pyfits.ImageHDU(np.array([self.radial,self.normed_pes,self.pes_error]))
     	hdu_ang=pyfits.ImageHDU(self.ang)
     	hdu_ang_var=pyfits.ImageHDU(self.ang_var)
     	hdu_out=pyfits.PrimaryHDU(self.output)
@@ -161,12 +161,12 @@ class Datas():
     
     def SaveFileDat(self,filepath):
     	root=filepath[:-4]
-    	np.savetxt(root+'_pes.dat',np.hstack((np.arange(Rbin),self.normed_pes,self.pes_error)).reshape((3,Rbin)),fmt='%f')
+    	np.savetxt(root+'_pes.dat',np.hstack((self.radial,self.normed_pes,self.pes_error)).reshape((3,Rbin)),fmt='%f')
     	np.savetxt(root+'_img_inv.dat',self.output,fmt='%f')
     	for beta in np.arange(1,self.get_NumberPoly()):
     		if self.odd: i=beta
     		else: i=2*beta
-    		np.savetxt(root+'_ang_b'+str(i)+'.dat',np.hstack((np.arange(Rbin),self.ang[beta,:],self.ang_var[beta,:])).reshape((3,Rbin)))
+    		np.savetxt(root+'_ang_b'+str(i)+'.dat',np.hstack((self.radial,self.ang[beta,:],self.ang_var[beta,:])).reshape((3,Rbin)))
               
     def get_com(self):
         datmax=self.datas.max()
@@ -265,7 +265,7 @@ class Datas():
     	return u,v,s
     
     def to_polar(self,data):
-    	return cart2pol(data,self.scale,self.center,self.r)
+    	return cart2pol(self,data)
     	
     def Invert(self,polar,u):
         #Resolve Basis*coeff=polar_dat
@@ -276,6 +276,7 @@ class Datas():
         width=2*Bwidth**2
         rad=np.arange(Rbin,dtype='f16')
         rad=np.sqrt(rad*self.r**2/float(Rbin))
+        self.radial=rad
         kvector=np.arange(Funcnumber)
         
         #Angular Matrix is of size NLxNR where NL is the number of Legendre polynoms and Nr the radial binning
@@ -310,7 +311,7 @@ class Datas():
         self.ang=angular
         self.ang_var=angular_var
     	self.pes_error=self.ang_var[0,:]
-    	self.radial=rad
+    	
         	
     def image_for_display(self):
     	dim=int(self.r+1)
@@ -335,7 +336,7 @@ class Datas():
     	
 # Auxiliary function to map cartesian data to a polar plane
 #Change to G. Garcia function from IGOR
-def cart2pol(data,scale,center,r):
+def cart2pol(struct,data):
 
 	"""
 		Cubic interpolation
@@ -355,22 +356,22 @@ def cart2pol(data,scale,center,r):
 	"""
 		Adapt the  selected area size to polar basis size
 	"""
-	nR=min(r,scale.nR)
+	nR=min(struct.r,struct.scale.nR)
 	if nR>Rbin: nR=Rbin #Security
 	
 	#Norm datas before cubic interpolation:
 	data/=data.max()
 	
 	Rfact=nR/float(Rbin)
-	scale.Rfact=Rfact
+	struct.scale.Rfact=Rfact
 	
 	rad=Rfact*np.concatenate([r*np.ones(2*r+1) for r in np.arange(Rbin)])
 	theta=np.concatenate([np.pi*np.arange(t)/t for t in 2*np.arange(Rbin)+1])
-	y=rad*np.cos(theta) + center[1]
-	x=-rad*np.sin(theta)*scale.ellipticity + center[0]
+	y=rad*np.cos(theta) + struct.center[1]
+	x=-rad*np.sin(theta)*struct.scale.ellipticity + struct.center[0]
 	#Cubic interpolation
-	xpix=x/scale.Xfact
-	ypix=y/scale.Yfact
+	xpix=x/struct.scale.Xfact
+	ypix=y/struct.scale.Yfact
 	ix=xpix.astype('int')
 	iy=ypix.astype('int')
 	dx=xpix-ix
@@ -386,11 +387,11 @@ def cart2pol(data,scale,center,r):
 	I,IY=np.meshgrid(i,iy)
 	IXJ=IX+J
 	IYI=IY+I
-	rule1=(IXJ<scale.nX) & (IXJ>=0)
-	rule2=(IYI<scale.nY) & (IYI>=0)
+	rule1=(IXJ<struct.scale.nX) & (IXJ>=0)
+	rule2=(IYI<struct.scale.nY) & (IYI>=0)
 	mask=np.all(rule1 & rule2,axis=1)
 	cub=cubic(J-dx.reshape((dx.shape[0],1)))*cubic(dy.reshape((dy.shape[0],1))-I)
-	dat=data.ravel()[(IYI*scale.nY+IXJ).ravel()].reshape(IXJ.shape)
+	dat=data.ravel()[(IYI*struct.scale.nY+IXJ).ravel()].reshape(IXJ.shape)
 	polar+=(dat*cub).sum(axis=1)
 	polar_var+=(dat*cub*cub).sum(axis=1)
 	return (polar,polar_var)

@@ -489,7 +489,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.axes.xaxis.set_major_formatter(nullfmt)
         self.axes.tick_params(bottom='off',top='off',left='off',right='off')
         #Deal with PES
-        self.axesPES.plot(self.workflow.normed_pes,'k')
+        self.axesPES.plot(self.workflow.radial,self.workflow.normed_pes,'k')
         self.axesPES.set_yticks([0,0.5,1.])
         self.axesPES.set_xlim([0,self.workflow.r])
         setp(self.axesPES.get_xticklabels(),fontsize=10)
