@@ -71,9 +71,8 @@ class Datas():
         r=np.sqrt(X**2+Y**2)
         self.datas=np.zeros_like(r)
         #self.datas[np.all([(r>75), (r<95)], axis=0)]=1-1.*eval_legendre(2,np.cos(theta[np.all([(r>75), (r<95)], axis=0)])) #Test distribution to convert to polar
-        self.datas=np.exp(-(r-140)**2/30)*(1.+1*eval_legendre(2,np.cos(theta))) +np.exp(-(r-60)**2/5)*(1.-1*eval_legendre(2,np.cos(theta))) +np.exp(-(r-80)**2/20)*(1.+2*eval_legendre(2,np.cos(theta)))
+        self.datas=0.1*np.exp(-(r-140)**2/30)*(1.+1*eval_legendre(2,np.cos(theta))) +0.1*np.exp(-(r-60)**2/5)*(1.-1*eval_legendre(2,np.cos(theta))) +0.05*np.exp(-(r-80)**2/20)*(1.+2*eval_legendre(2,np.cos(theta)))
         self.datas[self.datas<0]=0.
-        self.datas/=self.datas.max()
         #self.datas[self.datas<0.]=0.
         self.raw=self.datas
     
@@ -293,8 +292,8 @@ class Datas():
                 angular_var[l][ir]=sum(fradial*fradial*coefs_var[:,l])
 
         ang0=angular[0,:]
-        angular[:,ang0<=1e-3]=0.0
-        angular_var[:,ang0<=1e-3]=0.0
+        angular[:,ang0<=1e-5]=0.0
+        angular_var[:,ang0<=1e-5]=0.0
         a0=angular[0,:]
         ind=np.where(a0>0)[0]
 
