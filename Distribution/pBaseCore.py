@@ -329,11 +329,10 @@ class Datas():
     	xc=self.center[0]
     	dr=self.r
     	width=2*Bwidth**2
-    	NL=self.get_NumberPoly()
-    	odd=self.odd
+    	npl=self.lmax
+    	odd=int(self.odd)
     	coeff=self.coefficients
     	Imrz=self.output.ravel()
-    	pl=np.zeros(NL+1)
     	Rfact=(dr/float(Rbin))
     	support_code = 	"""
 							inline double theta_f(double x,double y){
@@ -357,7 +356,6 @@ class Datas():
 							
 								if(odd) NL=npl+1;
 								else NL=npl/2+1;
-							
 								x=(float)cos(X);
 								pl[0]=1.0;
 								pl[1]=x;
@@ -388,9 +386,9 @@ class Datas():
 						"""
     	code =	"""
 					using namespace std;
-					int kmin,kmax,ir,ik,il;
+					int kmin,kmax,ik;
 					double rad,func,dy,dx,thta,leg,sum,*pl;
-					pl=(double*)calloc(NL+1,sizeof(double)); // Allocate Legendre polynomials
+					pl=(double*)calloc(npl+1,sizeof(double)); // Allocate Legendre polynomials
 				
 					for(int iz=0;iz<nY;iz++){
 						dy=iz-(double)yc;
@@ -400,13 +398,13 @@ class Datas():
 							sum=0.0;
 							if (rad<(int)dr){
 								thta=theta_f(dx,dy);
-								kmin=(int)(rad/(double)Rfact/Bspace)-5;
+								kmin=(int)0;//(rad/(double)Rfact/Bspace)-5;
 								if(kmin<0) kmin=0;
-								kmax=(int)(rad/(double)Rfact/Bspace)+6;
+								kmax=(int)Funcnumber;//(rad/(double)Rfact/Bspace)+6;
 								if(kmax>Funcnumber) kmax=Funcnumber;
 								for(ik=kmin;ik<kmax;ik++){
 									func=exp(-(rad/(double)Rfact-ik*Bspace)*(rad/(double)Rfact-ik*Bspace)/width);
-									leg=ldist(thta,coeff,pl,NL,odd,ik);
+									leg=ldist(thta,coeff,pl,npl,odd,ik);
 									leg*=func;
 									sum+=leg;
 								}
@@ -419,7 +417,7 @@ class Datas():
 					}
 					free(pl);
 				"""
-    	weave.inline(code,arg_names=['nY','nX','yc','xc','dr','Rfact','Bspace','Funcnumber','width','coeff','NL','odd','Imrz'], type_converters=converters.blitz, extra_compile_args =['-stdlib=libc++ -std=gnu++11'], compiler='gcc',support_code=support_code,verbose=0)
+    	weave.inline(code,arg_names=['nY','nX','yc','xc','dr','Rfact','Bspace','Funcnumber','width','coeff','npl','odd','Imrz'], type_converters=converters.blitz, extra_compile_args =['-stdlib=libc++ -std=gnu++11'], compiler='gcc',support_code=support_code,verbose=0)
     	self.output=Imrz.reshape(self.raw.shape)
     	
 # Auxiliary function to map cartesian data to a polar plane
