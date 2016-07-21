@@ -71,9 +71,8 @@ class Datas():
         r=np.sqrt(X**2+Y**2)
         self.datas=np.zeros_like(r)
         #self.datas[np.all([(r>75), (r<95)], axis=0)]=1-1.*eval_legendre(2,np.cos(theta[np.all([(r>75), (r<95)], axis=0)])) #Test distribution to convert to polar
-        self.datas=np.exp(-(r-140)**2/30)*(1.+1*eval_legendre(2,np.cos(theta))) +np.exp(-(r-60)**2/5)*(1.-1*eval_legendre(2,np.cos(theta))) +np.exp(-(r-80)**2/20)*(1.+2*eval_legendre(2,np.cos(theta)))
+        self.datas=0.05*np.exp(-(r-140)**2/10)*(1.+1*eval_legendre(2,np.cos(theta))) + 1*np.exp(-(r-20)**2/5)*(1.-1*eval_legendre(2,np.cos(theta))) +0.1*np.exp(-(r-80)**2/20)*(1.+2*eval_legendre(2,np.cos(theta)))
         self.datas[self.datas<0]=0.
-        self.datas/=self.datas.max()
         #self.datas[self.datas<0.]=0.
         self.raw=self.datas
     
@@ -284,7 +283,7 @@ class Datas():
 						}
 						a0=angular(0,ir);
 						a0_var=angular_var(0,ir);
-						if(a0<=1e-3){
+						if(a0<=1e-5){
 							a0=0.0;
 							a0_var=0.0;
 							for(il=0;il<NL;il++){
@@ -334,6 +333,7 @@ class Datas():
     	coeff=self.coefficients
     	Imrz=self.output.ravel()
     	Rfact=(dr/float(Rbin))
+    	print "Calculating image"
     	support_code = 	"""
 							inline double theta_f(double x,double y){
 								double thta;
