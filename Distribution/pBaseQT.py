@@ -495,6 +495,7 @@ class pBaseForm(QtGui.QMainWindow):
         self.axesPES.errorbar(self.workflow.radial,self.workflow.normed_pes,yerr=self.workflow.ang_var[0,:],fmt='k')
         self.axesPES2.errorbar(self.workflow.radial,self.workflow.ang[1,:],yerr=self.workflow.ang_var[1,:],fmt='+r')
         self.axesPES.set_yticks([0,0.5,1.])
+        self.axesPES2.set_ylim([-1,2])
         self.axesPES.set_xlim([0,self.workflow.r])
         setp(self.axesPES.get_xticklabels(),fontsize=10)
         setp(self.axesPES.get_yticklabels(),fontsize=10)
@@ -697,8 +698,8 @@ class InvertProcesser(QtCore.QThread):
     def run(self):
     	self.gui.statlabel.setText("Start the inversion procedure")
         #U,V,S=self.workflow.LoadBasis(self.path)
-        U=self.workflow.LoadBasis(self.path)
-    	if len(U.shape)<2:
+        U=self.workflow.LoadBasis_svd(self.path)
+    	if len(U)<2:
     		QtGui.QMessageBox.warning(self,"No Basis","Basis file don't exist yet !!! \n Please build it first. :(")
     		return 0
     	self.gui.statlabel.setText("Basis Loaded")

@@ -72,9 +72,8 @@ class Datas():
 
         self.datas=np.zeros_like(r)
         #self.datas[np.all([(r>75), (r<95)], axis=0)]=1-1.*eval_legendre(2,np.cos(theta[np.all([(r>75), (r<95)], axis=0)])) #Test distribution to convert to polar
-        self.datas=np.exp(-(r-140)**2/30)*(1.+1*eval_legendre(2,np.cos(theta))) +np.exp(-(r-60)**2/5)*(1.-1*eval_legendre(2,np.cos(theta))) +np.exp(-(r-80)**2/20)*(1.+2*eval_legendre(2,np.cos(theta)))
+        self.datas=0.1*np.exp(-(r-140)**2/30)*(1.+1*eval_legendre(2,np.cos(theta))) +np.exp(-(r-60)**2/5)*(1.-1*eval_legendre(2,np.cos(theta))) +np.exp(-(r-80)**2/20)*(1.+2*eval_legendre(2,np.cos(theta)))
         self.datas[self.datas<0]=0.
-        self.datas/=self.datas.max()
         #self.datas[self.datas<0.]=0.
         self.raw=self.datas
     
@@ -276,9 +275,15 @@ class Datas():
     	
     def Invert(self,polar,u):
         #Resolve Basis*coeff=polar_dat
-        self.coefficients,residuts,siz,singulars=sp.linalg.lstsq(u,polar[0],lapack_driver='gelss')       #Need to build up angular distribution and PES
-        self.coefficients_var,residuts,siz,singulars=sp.linalg.lstsq(u**2,polar[1],lapack_driver='gelss')
-        del residuts,siz,singulars,polar,u
+        wi=(1/u[2])*(np.dot(u[0].T,polar[0]))
+        self.coefficients = np.dot(u[1],wi)
+        wi_var=(1/(u[2]*u[2]))*(np.dot(u[0].T*u[0].T,polar[1]))
+        self.coefficients_var = np.dot(u[1]*u[1],wi_var) 
+        del wi,wi_var,polar,u
+        
+        #self.coefficients,residuts,siz,singulars=sp.linalg.lstsq(u,polar[0],lapack_driver='gelss')       #Need to build up angular distribution and PES
+        #self.coefficients_var,residuts,siz,singulars=sp.linalg.lstsq(u**2,polar[1],lapack_driver='gelss')
+        #del residuts,siz,singulars,polar,u
 
         #self.coefficients,self.coefficients_var = svd_solve(u,v,s,polar)
 
@@ -303,8 +308,8 @@ class Datas():
                 angular_var[l][ir]=sum(fradial*fradial*coefs_var[:,l])
 
         ang0=angular[0,:]
-        angular[:,ang0<=1e-3]=0.0
-        angular_var[:,ang0<=1e-3]=0.0
+        angular[:,ang0<=1e-5]=0.0
+        angular_var[:,ang0<=1e-5]=0.0
         a0=angular[0,:]
         ind=np.where(a0>0)[0]
 
