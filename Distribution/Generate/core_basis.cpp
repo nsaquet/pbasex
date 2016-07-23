@@ -185,9 +185,8 @@ void write_forward(int l,int odd)
 
   //printf("Decomposing matrix, wait please ...\n");
   
-  //SAVING the basis BEFORE decomposition
-  memset(fileU,0,50);
-  memset(file,0,50);
+ //SAVING the basis BEFORE decomposition
+/*  memset(file,0,50);
   for(i=0;i<=l;i++)
   {
     if((i%2))
@@ -207,28 +206,28 @@ void write_forward(int l,int odd)
   fu=fopen(fileU,"w");
   gsl_matrix_fwrite(fu,Basis);
   gsl_matrix_free(Basis);
-  fclose(fu);
+  fclose(fu);*/
 
   /***********************/
   /* Decomposition stuff */
   /***********************/
   
   /*Allocate working space for decomposition */
-  /*
+  
   S=gsl_vector_alloc(N);
   V=gsl_matrix_alloc(N,N);
   W=gsl_vector_alloc(N);
   X=gsl_matrix_alloc(N,N);
-  */
+  
   /* Decompose */
-  /*
+  
   gsl_linalg_SV_decomp_mod(Basis,X,V,S,W);
   gsl_matrix_free(X);
   gsl_vector_free(W);
-  */
+  
 
   /* Describe matrices' names */
-  /*
+  
   memset(fileV,0,50);
   memset(fileU,0,50);
   memset(fileS,0,50);
@@ -257,9 +256,9 @@ void write_forward(int l,int odd)
   strcat(fileU,file);
   strcat(fileV,file);
   strcat(fileS,file);
-  */
+  
   /* Write everything to file */
-  /*
+  
   fu=fopen(fileU,"w");
   gsl_matrix_fwrite(fu,Basis);
   gsl_matrix_free(Basis);
@@ -274,12 +273,12 @@ void write_forward(int l,int odd)
   gsl_vector_fwrite(fs,S);
   gsl_vector_free(S);
   fclose(fs);
-  */
+  
 }
 
 int main ()
 {
 	write_forward(6,0);
-	write_forward(4,1);
+	//write_forward(4,1);
 	return 0;
 }

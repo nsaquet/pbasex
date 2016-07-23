@@ -71,7 +71,7 @@ class Datas():
         r=np.sqrt(X**2+Y**2)
         self.datas=np.zeros_like(r)
         #self.datas[np.all([(r>75), (r<95)], axis=0)]=1-1.*eval_legendre(2,np.cos(theta[np.all([(r>75), (r<95)], axis=0)])) #Test distribution to convert to polar
-        self.datas=0.1*np.exp(-(r-140)**2/30)*(1.+1*eval_legendre(2,np.cos(theta))) +0.1*np.exp(-(r-60)**2/5)*(1.-1*eval_legendre(2,np.cos(theta))) +0.05*np.exp(-(r-80)**2/20)*(1.+2*eval_legendre(2,np.cos(theta)))
+        self.datas=0.1*np.exp(-(r-140)**2/30)*(1.+0.64*eval_legendre(2,np.cos(theta))-0.69*eval_legendre(4,np.cos(theta))) +1*np.exp(-(r-60)**2/5)*(1.-1*eval_legendre(2,np.cos(theta))) +1*np.exp(-(r-80)**2/20)*(1.+2*eval_legendre(2,np.cos(theta)))
         self.datas[self.datas<0]=0.
         #self.datas[self.datas<0.]=0.
         self.raw=self.datas
@@ -216,28 +216,6 @@ class Datas():
         r_yind=int(2*y0)-yind
         
         return sum(self.datas[xind,yind]*self.datas[r_xind,r_yind])
-    
-    def LoadBasis(self,path):
-    	"""
-    		Look for Basis file and load it. We need only the initial basis for leastsq
-    	"""
-    	#Build basis file name
-    	if not self.odd: filenamescore=''.join(['P%i' %i for i in np.arange(0,self.lmax+1,2)])
-    	else:filenamescore=''.join(['P%i' %i for i in np.arange(0,self.lmax+1)])
-    	fileextension='.dat'
-    	fname='U'+filenamescore+fileextension
-    	Ufilename=join(path,fname)
-    	#Generate Basis file if not existing
-    	if not (isfile(Ufilename)): 
-    	    print 'files missing'
-    	    return -1
-    	
-    	#Loading file as a vector as in PBaseX.
-    	M=Rbin*Angbin  #correspond to the polar array dimension in the basis file NR=440 NTH=440
-    	N=self.get_NumberPoly()*Funcnumber #Number of polynoms by the number of function set to NR/2.
-    	u=np.fromfile(Ufilename,dtype=np.float64).reshape((M,N))
-    	
-    	return u
     	
     def LoadBasis_svd(self,path):
     	"""
@@ -268,9 +246,12 @@ class Datas():
     	
     def Invert(self,polar,u):
         #Resolve Basis*coeff=polar_dat
-        self.coefficients,residuts,siz,singulars=sp.linalg.lstsq(u,polar[0],lapack_driver='gelss')       #Need to build up angular distribution and PES
-        self.coefficients_var,residuts,siz,singulars=sp.linalg.lstsq(u**2,polar[1],lapack_driver='gelss')
-        del residuts,siz,singulars,polar,u
+        wi=(1/u[2])*(np.dot(u[0].T,polar[0]))
+        self.coefficients = np.dot(u[1],wi)
+        wi_var=(1/(u[2]*u[2]))*(np.dot(u[0].T*u[0].T,polar[1]))
+        self.coefficients_var = np.dot(u[1]*u[1],wi_var) 
+        del wi,wi_var,polar,u
+
                          
         width=2*Bwidth**2
         rad=np.arange(Rbin,dtype='f16')

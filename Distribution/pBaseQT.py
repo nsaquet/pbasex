@@ -692,8 +692,8 @@ class InvertProcesser(QtCore.QThread):
         
     def run(self):
     	self.gui.statlabel.setText("Start the inversion procedure")
-    	base=self.workflow.LoadBasis(self.path)
-    	if len(base.shape)<2: 
+    	base=self.workflow.LoadBasis_svd(self.path)
+    	if len(base)<3: 
     		QtGui.QMessageBox.warning(self,"No Basis","Basis file don't exist yet !!! \n Please build it first. :(")
     		return 0
     	self.gui.statlabel.setText("Basis Loaded")
